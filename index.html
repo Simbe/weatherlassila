@@ -217,7 +217,46 @@
   }
   .radar-time { top: calc(var(--u) * 1.2); }
   .radar-time b { color: var(--teal); font-weight: 600; margin-right: 0.3em; }
-  .radar-legend { bottom: calc(var(--u) * 1.2); }
+  /* bottom of the map: lightning pill, with the train notice under it when active */
+  .map-bottom {
+    position: absolute;
+    left: calc(var(--u) * 1.2);
+    right: calc(var(--u) * 1.2);
+    bottom: calc(var(--u) * 1.2);
+    z-index: 520;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--u) * 0.8);
+    pointer-events: none;
+  }
+  .map-bottom .map-pill { position: static; }
+  .map-notice {
+    align-self: stretch;
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--u) * 1);
+    background: rgba(11,18,32,0.82);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid rgba(244,169,74,0.45);
+    border-left: 3px solid var(--amber);
+    border-radius: calc(var(--u) * 0.9);
+    padding: calc(var(--u) * 0.8) calc(var(--u) * 1.2);
+  }
+  .map-notice[hidden] { display: none; }
+  .map-notice__icon { font-size: calc(var(--u) * 2.2); color: var(--amber); flex: 0 0 auto; margin-top: 0.1em; }
+  .map-notice__icon .wi { stroke: currentColor; }
+  .map-notice__text {
+    font-size: calc(var(--u) * 1.65);
+    line-height: 1.3;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .map-notice__more { color: var(--muted); margin-left: 0.4em; }
   #lightningCount { display: flex; align-items: center; gap: 0.4em; }
   #lightningCount .wi { width: 1em; height: 1em; }
 
@@ -306,7 +345,7 @@
     border-radius: var(--radius);
     display: flex;
     gap: calc(var(--u) * 0.4);
-    padding: calc(var(--u) * 0.6);
+    padding: calc(var(--u) * 0.5);
     overflow: hidden;
   }
   .strip-item {
@@ -330,7 +369,7 @@
     white-space: nowrap;
   }
   .is-now .strip-item__label { color: var(--text); font-weight: 600; }
-  .strip-item__icon { font-size: calc(var(--u) * 3.6); margin: calc(var(--u) * 0.35) 0 calc(var(--u) * 0.25); }
+  .strip-item__icon { font-size: calc(var(--u) * 3.3); margin: calc(var(--u) * 0.25) 0 calc(var(--u) * 0.15); }
   .strip-item__temp {
     font-family: var(--num);
     font-size: calc(var(--u) * 3.1);
@@ -347,7 +386,7 @@
     flex-direction: column;
     align-items: center;
     gap: calc(var(--u) * 0.25);
-    margin-top: calc(var(--u) * 0.3);
+    margin-top: calc(var(--u) * 0.2);
     width: 100%;
   }
   .pop-num {
@@ -372,12 +411,87 @@
     border-radius: 2px;
   }
 
-  .dash__footer {
+  /* TRAINS FROM POHJOIS-HAAGA (bottom bar, also carries update time + credits) */
+  .transit {
+    flex: 0 0 auto;
     display: flex;
-    justify-content: space-between;
-    padding: 0 calc(var(--u) * 0.6);
+    align-items: center;
+    gap: calc(var(--u) * 1.6);
+    height: calc(var(--u) * 4.6);
+    padding: 0 calc(var(--u) * 1.4) 0 calc(var(--u) * 1.6);
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: var(--radius);
+  }
+  .transit__icon { font-size: calc(var(--u) * 2.4); color: var(--muted); flex: 0 0 auto; }
+  .transit__icon .wi { stroke: currentColor; }
+  .transit__list {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 2.2);
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .dep-group {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 0.75);
+    white-space: nowrap;
+  }
+  .dep-group + .dep-group {
+    border-left: 1px solid var(--panel-edge);
+    padding-left: calc(var(--u) * 2.2);
+  }
+  .dep-t {
+    display: inline-flex;
+    align-items: baseline;
+    gap: calc(var(--u) * 0.55);
+    margin-left: calc(var(--u) * 0.7);
+  }
+  .dep__tag { font-size: calc(var(--u) * 1.4); font-weight: 500; color: var(--muted); }
+  .dep__line {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--u) * 2.7);
+    height: calc(var(--u) * 2.7);
+    border-radius: calc(var(--u) * 0.6);
+    background: #8C4799;           /* HSL commuter-train purple */
+    color: #fff;
+    font-family: var(--num);
+    font-weight: 700;
+    font-size: calc(var(--u) * 1.65);
+  }
+  .dep__dest { font-size: calc(var(--u) * 1.85); color: var(--muted); }
+  .dep__time {
+    font-family: var(--num);
+    font-variant-numeric: tabular-nums;
+    font-size: calc(var(--u) * 2.5);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .dep__late {
+    font-family: var(--num);
+    font-variant-numeric: tabular-nums;
+    font-size: calc(var(--u) * 2.1);
+    font-weight: 600;
+    color: var(--amber);
+    margin-left: calc(var(--u) * -0.2);
+  }
+  .dep__cancel { font-size: calc(var(--u) * 1.7); font-weight: 600; color: var(--red); }
+  .dep-t.is-cancelled .dep__time { text-decoration: line-through; color: var(--muted-dim); }
+  .dep-empty { font-size: calc(var(--u) * 1.7); color: var(--muted-dim); }
+  .transit__meta {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    font-size: calc(var(--u) * 1.1);
+    line-height: 1.2;
     color: var(--muted-dim);
-    font-size: calc(var(--u) * 1.3);
+    text-align: right;
   }
 
   /* LIGHTNING ALERT (only shown when a strike is within 20 km) */
@@ -441,8 +555,14 @@
       <div id="map"></div>
       <div class="map-vignette"></div>
       <div class="map-pill radar-time num tnum" id="radarTime">Loading radar&hellip;</div>
-      <div class="map-pill radar-legend num">
-        <div id="lightningCount">&#9889; &mdash;</div>
+      <div class="map-bottom">
+        <div class="map-pill radar-legend num">
+          <div id="lightningCount">&#9889; &mdash;</div>
+        </div>
+        <div class="map-notice" id="trainNotice" hidden>
+          <span class="map-notice__icon"><svg class="wi" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="15" rx="3.5"/><path d="M5 10.5h14M9 14h.01M15 14h.01M8.5 17.5 6.5 21.5M15.5 17.5l2 4M7.6 19.5h8.8"/></svg></span>
+          <span class="map-notice__text" id="trainNoticeText"></span>
+        </div>
       </div>
     </section>
 
@@ -468,9 +588,14 @@
   <section class="strip hourly" id="hourlyStrip" aria-label="Next hours"></section>
   <section class="strip daily" id="dailyStrip" aria-label="Next 7 days"></section>
 
-  <footer class="dash__footer">
-    <span id="updatedAt">Starting up&hellip;</span>
-    <span>Data from FMI and Open-Meteo, map by Esri</span>
+  <footer class="transit" aria-label="Next trains from Pohjois-Haaga">
+    <span class="transit__icon" title="Trains from Pohjois-Haaga"><svg class="wi" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="15" rx="3.5"/><path d="M5 10.5h14M9 14h.01M15 14h.01M8.5 17.5 6.5 21.5M15.5 17.5l2 4M7.6 19.5h8.8"/></svg></span>
+    <div class="transit__list" id="trainList"><span class="dep-empty">Loading trains&hellip;</span></div>
+    <div class="transit__meta">
+      <span id="updatedAt">Starting up&hellip;</span>
+      <span>FMI, Open-Meteo, Esri</span>
+      <span>Fintraffic / digitraffic.fi</span>
+    </div>
   </footer>
 
 </div>
@@ -1315,6 +1440,217 @@
     }).catch(function(){ /* Open-Meteo strips (if any) stay as-is */ });
   }
 
+  /* ---------- Trains from Pohjois-Haaga (Fintraffic Digitraffic: free, no key) ---------- */
+  // Station POH = Pohjois-Haaga. I trains run straight to Helsinki; P trains go
+  // the other way round the ring via the airport. Direction is read from each
+  // train's remaining stops, so it stays right even if lines change.
+  var TRAIN_STATION = 'POH';
+  var TRAINS_REQUESTED = 20;
+  var TRAIN_URL = 'https://rata.digitraffic.fi/api/v1/live-trains/station/' + TRAIN_STATION +
+    '?arrived_trains=0&arriving_trains=0&departed_trains=0&departing_trains=' + TRAINS_REQUESTED + '&include_nonstopping=false';
+  var DIGITRAFFIC_USER = 'weatherlassila/1.4'; // Fintraffic asks apps to identify themselves
+  var TIMES_PER_DIRECTION = 2;
+  var NIGHT_GAP_MS = 90 * 60 * 1000;   // a gap this long means "last train" / "first train"
+  var DIRECTION_ORDER = ['Helsinki', 'Airport'];
+  var STATION_NAMES = { HKI: 'Helsinki', PSL: 'Pasila', HPL: 'Huopalahti', KAN: 'Kannelmäki',
+    MLO: 'Malminkartano', MYR: 'Myyrmäki', VKS: 'Vantaankoski', LEN: 'Airport', TKL: 'Tikkurila' };
+
+  var trainDepartures = [];   // [{ line, dest, ms, sched, cancelled }]
+  var trainsOkAt = 0;
+  var trainsFailed = false;
+  var trainsTimer = null;
+  var sendUserHeader = true;  // dropped once if the browser refuses the custom header
+
+  function fetchTrains(){
+    var opts = sendUserHeader ? { headers: { 'Digitraffic-User': DIGITRAFFIC_USER } } : {};
+    return fetch(TRAIN_URL, opts)
+      .catch(function(err){
+        if (!sendUserHeader) throw err;
+        // Retry without the header. Only stop sending it if that works, so a
+        // Wi-Fi blip doesn't make the dashboard anonymous until a reload.
+        return fetch(TRAIN_URL).then(function(r){ sendUserHeader = false; return r; });
+      })
+      .then(function(r){
+        if (!r.ok) throw new Error('Digitraffic HTTP ' + r.status);
+        return r.json();
+      });
+  }
+
+  function parseTrains(trains){
+    var out = [];
+    for (var i = 0; i < trains.length; i++){
+      var tr = trains[i];
+      var rows = tr.timeTableRows || [];
+      var k = -1;
+      for (var j = 0; j < rows.length; j++){
+        if (rows[j].stationShortCode === TRAIN_STATION && rows[j].type === 'DEPARTURE') { k = j; break; }
+      }
+      if (k < 0) continue;
+      var row = rows[k];
+      if (row.trainStopping === false || row.commercialStop === false) continue;
+      if (row.actualTime) continue;          // already left
+      var sched = Date.parse(row.scheduledTime);
+      var ms = Date.parse(row.liveEstimateTime || row.scheduledTime);
+      if (isNaN(ms) || isNaN(sched)) continue;
+      var toAirport = false;
+      for (var m = k + 1; m < rows.length; m++){
+        if (rows[m].stationShortCode === 'LEN') { toAirport = true; break; }
+      }
+      var last = rows.length ? rows[rows.length - 1].stationShortCode : '';
+      out.push({
+        line: String(tr.commuterLineID || tr.trainType || '').slice(0, 3),
+        dest: toAirport ? 'Airport' : (STATION_NAMES[last] || last),
+        ms: ms,            // best estimate (live if available)
+        sched: sched,      // timetable time
+        cancelled: !!(tr.cancelled || row.cancelled)
+      });
+    }
+    out.sort(function(a, b){ return a.ms - b.ms; });
+    return out;
+  }
+
+  function renderTrains(){
+    var el = document.getElementById('trainList');
+    var now = Date.now();
+    if ((trainsOkAt && now - trainsOkAt > 10 * 60 * 1000) || (!trainsOkAt && trainsFailed)) {
+      el.innerHTML = '<span class="dep-empty">Train times unavailable · retrying</span>';
+      return;
+    }
+    // Group the upcoming departures by direction (Helsinki first, then Airport).
+    var groups = {}, order = [];
+    for (var i = 0; i < trainDepartures.length; i++){
+      var d = trainDepartures[i];
+      if (d.ms <= now - 30 * 1000) continue;            // gone
+      if (!groups[d.dest]) { groups[d.dest] = { dest: d.dest, line: d.line, items: [] }; order.push(d.dest); }
+      groups[d.dest].items.push(d);
+    }
+    if (!order.length) {
+      el.innerHTML = '<span class="dep-empty">' + (trainsOkAt ? 'No more trains tonight' : 'Loading trains…') + '</span>';
+      return;
+    }
+    order.sort(function(a, b){
+      var ia = DIRECTION_ORDER.indexOf(a), ib = DIRECTION_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+
+    var html = '';
+    for (var g = 0; g < order.length; g++){
+      var grp = groups[order[g]];
+      html += '<div class="dep-group">' +
+        '<span class="dep__line">' + grp.line.replace(/[^A-Za-z0-9]/g, '') + '</span>' +
+        '<span class="dep__dest">' + grp.dest.replace(/[<>&]/g, '') + '</span>';
+      for (var k = 0; k < grp.items.length && k < TIMES_PER_DIRECTION; k++){
+        var it = grp.items[k];
+        var prev = grp.items[k - 1];
+        var next = grp.items[k + 1];
+        // "First": a long gap before it (overnight break, or still far off this morning).
+        var gapBefore = prev ? it.sched - prev.sched : it.ms - now;
+        var isFirst = gapBefore > NIGHT_GAP_MS;
+        // "Last": the next train this way is only after a long gap. Only labelled when
+        // that next train is actually in the data, so nothing is guessed.
+        var isLast = !isFirst && !!next && (next.sched - it.sched > NIGHT_GAP_MS);
+        var schedStr = fmtTime(new Date(it.sched));
+        var estStr = fmtTime(new Date(it.ms));
+        html += '<span class="dep-t' + (it.cancelled ? ' is-cancelled' : '') + '">' +
+          (isLast ? '<span class="dep__tag">Last</span>' : isFirst ? '<span class="dep__tag">First</span>' : '') +
+          '<span class="dep__time">' + schedStr + '</span>' +
+          (it.cancelled ? '<span class="dep__cancel">Cancelled</span>'
+                        : (estStr !== schedStr ? '<span class="dep__late">~' + estStr + '</span>' : '')) +
+          '</span>';
+      }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+
+    // Too wide (e.g. several delays)? Drop second times, last direction first; then whole directions.
+    var guard = 0;
+    while (el.scrollWidth > el.clientWidth + 1 && guard++ < 10){
+      var grpEls = el.querySelectorAll('.dep-group');
+      var removed = false;
+      for (var r = grpEls.length - 1; r >= 0 && !removed; r--){
+        var ts = grpEls[r].querySelectorAll('.dep-t');
+        if (ts.length > 1) { grpEls[r].removeChild(ts[ts.length - 1]); removed = true; }
+      }
+      if (!removed) {
+        if (grpEls.length > 1) el.removeChild(grpEls[grpEls.length - 1]);
+        else break;
+      }
+    }
+  }
+
+  /* ---------- Station notices for Pohjois-Haaga (track works, replacement buses...) ---------- */
+  // Fintraffic passenger information (RAMI). only_general=true: notices about the
+  // station itself, not individual trains (those already show in the times).
+  var NOTICE_URL = 'https://rata.digitraffic.fi/api/v1/passenger-information/active?station=' +
+    TRAIN_STATION + '&only_general=true';
+  var noticeTimer = null;
+
+  function noticeText(msg){
+    var parts = [msg.video, msg.audio];
+    for (var i = 0; i < parts.length; i++){
+      var tx = parts[i] && parts[i].text;
+      if (tx && tx.en) return tx.en;
+    }
+    for (var j = 0; j < parts.length; j++){
+      var tf = parts[j] && parts[j].text;
+      if (tf && tf.fi) return tf.fi;
+    }
+    return '';
+  }
+
+  function loadNotices(){
+    var opts = sendUserHeader ? { headers: { 'Digitraffic-User': DIGITRAFFIC_USER } } : {};
+    fetch(NOTICE_URL, opts).then(function(r){
+      if (!r.ok) throw new Error('Digitraffic HTTP ' + r.status);
+      return r.json();
+    }).then(function(list){
+      var now = Date.now(), texts = [];
+      if (Array.isArray(list)){
+        for (var i = 0; i < list.length; i++){
+          var m = list[i];
+          var start = Date.parse(m.startValidity), end = Date.parse(m.endValidity);
+          if (!isNaN(start) && start > now) continue;
+          if (!isNaN(end) && end < now) continue;
+          var tx = noticeText(m).replace(/\s+/g, ' ').trim();
+          if (tx && texts.indexOf(tx) < 0) texts.push(tx);
+        }
+      }
+      var box = document.getElementById('trainNotice');
+      if (!texts.length) { box.hidden = true; return; }
+      var more = texts.length > 1 ? '<span class="map-notice__more">(+' + (texts.length - 1) + ' more)</span>' : '';
+      document.getElementById('trainNoticeText').innerHTML =
+        texts[0].replace(/[<>&]/g, '') + more;
+      box.hidden = false;
+    }).catch(function(){ /* keep whatever is showing; try again next round */ })
+      .then(function(){
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(loadNotices, 5 * 60 * 1000);
+      });
+  }
+
+  function loadTrains(){
+    fetchTrains().then(function(data){
+      var arr = Array.isArray(data) ? data : [];
+      trainDepartures = parseTrains(arr);
+      trainsOkAt = Date.now();
+      trainsFailed = false;
+      renderTrains();
+      scheduleTrains(30 * 1000);
+    }).catch(function(){
+      trainsFailed = true;
+      renderTrains();                       // keep counting down the last known times
+      scheduleTrains(60 * 1000);
+    });
+  }
+  function scheduleTrains(ms){
+    clearTimeout(trainsTimer);
+    trainsTimer = setTimeout(loadTrains, ms);
+  }
+
+  loadTrains();
+  loadNotices();
+  setInterval(renderTrains, 15 * 1000);     // minutes count down between fetches
+
   loadWeather(); // reschedules itself; also refreshes the FMI strips
 
   // Tablets pause timers while the screen is off. When the page becomes
@@ -1322,6 +1658,8 @@
   document.addEventListener('visibilitychange', function(){
     if (document.visibilityState !== 'visible') return;
     if (Date.now() - lastWeatherOkAt > 10 * 60 * 1000) loadWeather();
+    loadTrains();
+    loadNotices();
     loadLightning();
     loadRadar();
   });
