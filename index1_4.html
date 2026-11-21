@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0B1220">
+<title>Lassila Weather Dashboard</title>
+<link rel="icon" href="data:,"><!-- no favicon; stops the 404 in the console -->
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* Everything is sized from --u, so the dashboard fills a 4:3 screen exactly
+     (1 u = 10.24 px on a 1024x768 iPad) and scales evenly on larger screens. */
+  :root{
+    --bg:#0B1220;
+    --panel:#111B2E;
+    --panel-edge:#1C2A45;
+    --border:#223050;
+    --text:#EAF2FF;
+    --muted:#93A6C8;
+    --muted-dim:#62769A;
+    --amber:#F4A94A;
+    --teal:#4FD1C5;
+    --red:#E8646B;
+    --u: min(1vw, 1.3333vh);
+    --gap: calc(var(--u) * 1.1);
+    --radius: calc(var(--u) * 1.6);
+    --num: 'Space Grotesk', 'Inter', -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .dash {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    height: 100vh;
+    width: 100vw;
+    padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6) calc(var(--u) * 0.9);
+    background:
+      radial-gradient(ellipse at 15% 0%, rgba(79,209,197,0.07), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(244,169,74,0.05), transparent 55%),
+      var(--bg);
+  }
+  .dash > * { position: relative; z-index: 1; }
+
+  .tint-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    transition: opacity 3s ease;
+  }
+  #nightTint {
+    background: radial-gradient(ellipse at 50% -10%, rgba(20,30,60,0.9), rgba(6,9,20,0.55) 70%);
+    opacity: 0;
+  }
+  #duskTint {
+    background: radial-gradient(ellipse at 15% 0%, rgba(244,169,74,0.22), transparent 60%);
+    opacity: 0;
+  }
+
+  /* numbers: same face everywhere, digits that don't jiggle as they change */
+  .num { font-family: var(--num); }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* WEATHER ICONS (inline SVG, duotone) */
+  .wi {
+    display: block;
+    width: 1em;
+    height: 1em;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .wi-cloud { stroke: #AFC0DC; }
+  .wi-knock { fill: var(--panel); }
+  .wi-sun   { stroke: var(--amber); }
+  .wi-moon  { stroke: #C9D6EF; }
+  .wi-rain  { stroke: var(--teal); }
+  .wi-snow  { stroke: #DCE8FA; stroke-width: 2.6; }
+  .wi-flake { stroke-width: 1.7; }
+  .wi-fog   { stroke: #8FA3C4; }
+  .wi-bolt  { stroke: var(--amber); }
+
+  /* HEADER: same two columns as the panels below, so every edge lines up.
+     Date over the radar; sun times + clock over the current panel. */
+  .dash__header {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    column-gap: var(--gap);
+    align-items: center;
+    padding-bottom: calc(var(--u) * 0.9);
+    border-bottom: 1px solid var(--border);
+  }
+  .clock__date {
+    font-size: calc(var(--u) * 4.1);
+    line-height: 1;
+    letter-spacing: -0.015em;
+    white-space: nowrap;
+    padding-left: calc(var(--u) * 0.3);
+  }
+  .clock__weekday { color: var(--text); font-weight: 600; }
+  .clock__daymonth { color: var(--muted); font-weight: 500; }
+  .header-right {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* sun times start where the current panel's content starts */
+    padding-left: calc(var(--u) * 2.2 + 1px);
+    padding-right: calc(var(--u) * 0.3);
+  }
+  .sun-info {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 0.4);
+  }
+  .sun-info__item {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 0.7);
+    font-size: calc(var(--u) * 2.45);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--muted);
+  }
+  .sun-info__icon {
+    font-size: calc(var(--u) * 2.5);
+    color: var(--amber);
+  }
+  .sun-info__icon .wi { stroke: currentColor; }
+  .clock__time {
+    font-size: calc(var(--u) * 5.6);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+  .clock__sec {
+    font-size: 0.5em;
+    font-weight: 500;
+    color: var(--muted-dim);
+    margin-left: 0.12em;
+  }
+
+  /* MAIN */
+  .dash__main {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    grid-gap: var(--gap);
+    min-height: 0;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: var(--radius);
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .radar-panel #map {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #0d1626;
+  }
+  .base-tiles { filter: brightness(1.25) contrast(0.92) saturate(1.1); }
+  .radar-frame { transition: opacity 0.35s ease; }
+  .label-tiles { filter: brightness(1.35) contrast(1.05); }
+  .map-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: 510;
+    pointer-events: none;
+    box-shadow: inset 0 0 70px rgba(7, 12, 24, 0.55);
+  }
+
+  /* pills over the map: radar time (top) and lightning count (bottom) */
+  .map-pill {
+    position: absolute;
+    left: calc(var(--u) * 1.2);
+    z-index: 520;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    background: rgba(11,18,32,0.62);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid var(--panel-edge);
+    border-radius: calc(var(--u) * 0.9);
+    padding: calc(var(--u) * 0.45) calc(var(--u) * 1);
+    font-size: calc(var(--u) * 1.6);
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .radar-time { top: calc(var(--u) * 1.2); }
+  .radar-time b { color: var(--teal); font-weight: 600; margin-right: 0.3em; }
+  /* bottom of the map: lightning pill, with the train notice under it when active */
+  .map-bottom {
+    position: absolute;
+    left: calc(var(--u) * 1.2);
+    right: calc(var(--u) * 1.2);
+    bottom: calc(var(--u) * 1.2);
+    z-index: 520;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--u) * 0.8);
+    pointer-events: none;
+  }
+  .map-bottom .map-pill { position: static; }
+  .map-notice {
+    align-self: stretch;
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--u) * 1);
+    background: rgba(11,18,32,0.82);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid rgba(244,169,74,0.45);
+    border-left: 3px solid var(--amber);
+    border-radius: calc(var(--u) * 0.9);
+    padding: calc(var(--u) * 0.8) calc(var(--u) * 1.2);
+  }
+  .map-notice[hidden] { display: none; }
+  .map-notice__icon { font-size: calc(var(--u) * 2.2); color: var(--amber); flex: 0 0 auto; margin-top: 0.1em; }
+  .map-notice__icon .wi { stroke: currentColor; }
+  .map-notice__text {
+    font-size: calc(var(--u) * 1.65);
+    line-height: 1.3;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .map-notice__more { color: var(--muted); margin-left: 0.4em; }
+  #lightningCount { display: flex; align-items: center; gap: 0.4em; }
+  #lightningCount .wi { width: 1em; height: 1em; }
+
+  /* CURRENT CONDITIONS */
+  .current-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: calc(var(--u) * 1.5) calc(var(--u) * 2.2) calc(var(--u) * 1.6);
+  }
+  .current__top {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 1.2);
+  }
+  .current__icon { font-size: calc(var(--u) * 7.6); line-height: 1; flex: 0 0 auto; }
+  .current__temp {
+    font-size: calc(var(--u) * 10.2);
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+  }
+  .current__cond {
+    font-size: calc(var(--u) * 2.5);
+    font-weight: 600;
+    line-height: 1.15;
+    margin-top: calc(var(--u) * 0.7);
+  }
+  .current__feels {
+    font-size: calc(var(--u) * 1.9);
+    color: var(--muted);
+    margin-top: calc(var(--u) * 0.2);
+  }
+  .current__feels span { color: var(--text); font-weight: 600; }
+
+  .current__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: calc(var(--u) * 1.2) calc(var(--u) * 2);
+    margin-top: calc(var(--u) * 1.2);
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 0.15);
+    min-width: 0;
+  }
+  .stat__label {
+    font-size: calc(var(--u) * 1.55);
+    font-weight: 500;
+    color: var(--muted-dim);
+  }
+  .stat__value {
+    font-size: calc(var(--u) * 3.2);
+    font-weight: 600;
+    line-height: 1.05;
+    white-space: nowrap;
+  }
+  .unit {
+    font-size: 0.5em;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 0.15em;
+  }
+  .unit--tight { margin-left: 0.02em; }
+  .wind-arrow {
+    display: inline-block;
+    font-style: normal;
+    color: var(--teal);
+    margin-left: 0.35em;
+    font-size: 0.6em;
+    vertical-align: 0.1em;
+  }
+  .wind-dir {
+    font-size: 0.5em;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 0.1em;
+  }
+
+  /* HOURLY / WEEKLY STRIPS */
+  .strip {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: var(--radius);
+    display: flex;
+    gap: calc(var(--u) * 0.4);
+    padding: calc(var(--u) * 0.5);
+    overflow: hidden;
+  }
+  .strip-item {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--u) * 0.5) calc(var(--u) * 0.2) calc(var(--u) * 0.6);
+    border-radius: calc(var(--u) * 1.1);
+  }
+  .strip-item.is-now {
+    background: rgba(255,255,255,0.045);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .strip-item__label {
+    font-size: calc(var(--u) * 1.8);
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .is-now .strip-item__label { color: var(--text); font-weight: 600; }
+  .strip-item__icon { font-size: calc(var(--u) * 3.3); margin: calc(var(--u) * 0.25) 0 calc(var(--u) * 0.15); }
+  .strip-item__temp {
+    font-family: var(--num);
+    font-size: calc(var(--u) * 3.1);
+    letter-spacing: -0.01em;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .daily .strip-item__temp { font-size: calc(var(--u) * 2.75); }
+  .daily .strip-item__temp-max { color: var(--text); }
+  .daily .strip-item__temp-min { color: var(--muted-dim); margin-left: 0.2em; }
+  .strip-item__pop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--u) * 0.25);
+    margin-top: calc(var(--u) * 0.2);
+    width: 100%;
+  }
+  .pop-num {
+    font-family: var(--num);
+    font-size: calc(var(--u) * 1.55);
+    font-weight: 500;
+    color: var(--teal);
+    line-height: 1;
+    min-height: calc(var(--u) * 1.55);
+  }
+  .pop-bar {
+    width: 56%;
+    height: calc(var(--u) * 0.35);
+    border-radius: 2px;
+    background: rgba(79, 209, 197, 0.14);
+    overflow: hidden;
+  }
+  .pop-bar i {
+    display: block;
+    height: 100%;
+    background: var(--teal);
+    border-radius: 2px;
+  }
+
+  /* TRAINS FROM POHJOIS-HAAGA (bottom bar, also carries update time + credits) */
+  .transit {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 1.6);
+    height: calc(var(--u) * 4.6);
+    padding: 0 calc(var(--u) * 1.4) 0 calc(var(--u) * 1.6);
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: var(--radius);
+  }
+  .transit__icon { font-size: calc(var(--u) * 2.4); color: var(--muted); flex: 0 0 auto; }
+  .transit__icon .wi { stroke: currentColor; }
+  .transit__list {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 2.2);
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .dep-group {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 0.75);
+    white-space: nowrap;
+  }
+  .dep-group + .dep-group {
+    border-left: 1px solid var(--panel-edge);
+    padding-left: calc(var(--u) * 2.2);
+  }
+  .dep-t {
+    display: inline-flex;
+    align-items: baseline;
+    gap: calc(var(--u) * 0.55);
+    margin-left: calc(var(--u) * 0.7);
+  }
+  .dep__tag { font-size: calc(var(--u) * 1.4); font-weight: 500; color: var(--muted); }
+  .dep__line {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--u) * 2.7);
+    height: calc(var(--u) * 2.7);
+    border-radius: calc(var(--u) * 0.6);
+    background: #8C4799;           /* HSL commuter-train purple */
+    color: #fff;
+    font-family: var(--num);
+    font-weight: 700;
+    font-size: calc(var(--u) * 1.65);
+  }
+  .dep__dest { font-size: calc(var(--u) * 1.85); color: var(--muted); }
+  .dep__time {
+    font-family: var(--num);
+    font-variant-numeric: tabular-nums;
+    font-size: calc(var(--u) * 2.5);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .dep__late {
+    font-family: var(--num);
+    font-variant-numeric: tabular-nums;
+    font-size: calc(var(--u) * 2.1);
+    font-weight: 600;
+    color: var(--amber);
+    margin-left: calc(var(--u) * -0.2);
+  }
+  .dep__cancel { font-size: calc(var(--u) * 1.7); font-weight: 600; color: var(--red); }
+  .dep-t.is-cancelled .dep__time { text-decoration: line-through; color: var(--muted-dim); }
+  .dep-empty { font-size: calc(var(--u) * 1.7); color: var(--muted-dim); }
+  .transit__meta {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    font-size: calc(var(--u) * 1.1);
+    line-height: 1.2;
+    color: var(--muted-dim);
+    text-align: right;
+  }
+
+  /* LIGHTNING ALERT (only shown when a strike is within 20 km) */
+  .lightning-alert {
+    display: none;
+    align-items: center;
+    gap: calc(var(--u) * 1.4);
+    background: linear-gradient(90deg, rgba(232,100,107,0.18), rgba(244,169,74,0.14));
+    border: 1px solid rgba(232,100,107,0.55);
+    border-radius: var(--radius);
+    padding: calc(var(--u) * 0.9) calc(var(--u) * 1.8);
+    animation: alertGlow 2.2s ease-in-out infinite;
+  }
+  .lightning-alert.active { display: flex; }
+  .lightning-alert__icon { font-size: calc(var(--u) * 3); line-height: 1; }
+  .lightning-alert__text { font-weight: 700; font-size: calc(var(--u) * 2.1); }
+  .lightning-alert__sub { font-size: calc(var(--u) * 1.6); color: var(--muted); margin-top: 2px; }
+  @keyframes alertGlow {
+    0%, 100% { box-shadow: 0 0 0 rgba(232,100,107,0); }
+    50% { box-shadow: 0 0 20px rgba(232,100,107,0.5); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lightning-alert { animation: none; }
+    .tint-layer, .radar-frame { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="dash">
+  <div class="tint-layer" id="nightTint"></div>
+  <div class="tint-layer" id="duskTint"></div>
+
+  <header class="dash__header">
+    <div class="clock__date num" id="clockDate">&mdash;</div>
+    <div class="header-right">
+      <div class="sun-info">
+        <span class="sun-info__item" title="Sunrise">
+          <span class="sun-info__icon"><svg class="wi" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M6.5 19a5.5 5.5 0 0 1 11 0M12 3v6M9.3 5.6 12 3l2.7 2.6M3.8 12.6l1.5 1.1M20.2 12.6l-1.5 1.1"/></svg></span>
+          <span class="num tnum" id="headerSunrise">--:--</span>
+        </span>
+        <span class="sun-info__item" title="Sunset">
+          <span class="sun-info__icon"><svg class="wi" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M6.5 19a5.5 5.5 0 0 1 11 0M12 3v6M9.3 6.4 12 9l2.7-2.6M3.8 12.6l1.5 1.1M20.2 12.6l-1.5 1.1"/></svg></span>
+          <span class="num tnum" id="headerSunset">--:--</span>
+        </span>
+      </div>
+      <div class="clock__time num tnum" id="clockTime">--:--</div>
+    </div>
+  </header>
+
+  <div class="lightning-alert" id="lightningAlert">
+    <span class="lightning-alert__icon"><svg class="wi" viewBox="-1 -1 26 26"><polygon class="wi-bolt" points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+    <div>
+      <div class="lightning-alert__text" id="lightningAlertText">Lightning nearby</div>
+      <div class="lightning-alert__sub" id="lightningAlertSub">&mdash;</div>
+    </div>
+  </div>
+
+  <main class="dash__main">
+    <section class="panel radar-panel">
+      <div id="map"></div>
+      <div class="map-vignette"></div>
+      <div class="map-pill radar-time num tnum" id="radarTime">Loading radar&hellip;</div>
+      <div class="map-bottom">
+        <div class="map-pill radar-legend num">
+          <div id="lightningCount">&#9889; &mdash;</div>
+        </div>
+        <div class="map-notice" id="trainNotice" hidden>
+          <span class="map-notice__icon"><svg class="wi" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="15" rx="3.5"/><path d="M5 10.5h14M9 14h.01M15 14h.01M8.5 17.5 6.5 21.5M15.5 17.5l2 4M7.6 19.5h8.8"/></svg></span>
+          <span class="map-notice__text" id="trainNoticeText"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel current-panel">
+      <div>
+        <div class="current__top">
+          <div class="current__icon" id="curIcon"><svg class="wi" viewBox="-1 -1 26 26"><path class="wi-cloud" d="M18 10h-1.26A8 8 0 1 0 9 20h9a4 4 0 0 0 0-8z"/></svg></div>
+          <div class="current__temp num" id="curTemp">--&deg;</div>
+        </div>
+        <div class="current__cond" id="curCond">&mdash;</div>
+        <div class="current__feels">Feels like <span class="num" id="curFeels">--&deg;</span></div>
+      </div>
+
+      <div class="current__grid">
+        <div class="stat"><span class="stat__label">Wind</span><span class="stat__value num" id="curWind">&ndash;</span></div>
+        <div class="stat"><span class="stat__label">Gusts</span><span class="stat__value num" id="curGust">&ndash;</span></div>
+        <div class="stat"><span class="stat__label">Humidity</span><span class="stat__value num" id="curHumidity">&ndash;</span></div>
+        <div class="stat"><span class="stat__label">Pressure</span><span class="stat__value num" id="curPressure">&ndash;</span></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="strip hourly" id="hourlyStrip" aria-label="Next hours"></section>
+  <section class="strip daily" id="dailyStrip" aria-label="Next 7 days"></section>
+
+  <footer class="transit" aria-label="Next trains from Pohjois-Haaga">
+    <span class="transit__icon" title="Trains from Pohjois-Haaga"><svg class="wi" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="15" rx="3.5"/><path d="M5 10.5h14M9 14h.01M15 14h.01M8.5 17.5 6.5 21.5M15.5 17.5l2 4M7.6 19.5h8.8"/></svg></span>
+    <div class="transit__list" id="trainList"><span class="dep-empty">Loading trains&hellip;</span></div>
+    <div class="transit__meta">
+      <span id="updatedAt">Starting up&hellip;</span>
+      <span>FMI, Open-Meteo, Esri</span>
+      <span>Fintraffic / digitraffic.fi</span>
+    </div>
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+(function(){
+
+  var LAT = 60.2292;
+  var LON = 24.8842;
+
+
+  /* ---------- Inline SVG weather icons (duotone, palette-matched) ---------- */
+  var WI_CLOUD = 'M18 10h-1.26A8 8 0 1 0 9 20h9a4 4 0 0 0 0-8z';
+  var WI_CLOUD_HI = 'M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25';
+  var WI_BOLT_CLOUD = 'M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9';
+  var ZAP_MINI = '<svg class="wi" viewBox="-1 -1 26 26"><polygon class="wi-bolt" points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+
+  function svgIcon(kind){
+    var s = '<svg class="wi" viewBox="-1 -1 26 26" aria-hidden="true">';
+    var cloudHi = '<path class="wi-cloud" d="' + WI_CLOUD_HI + '"/>';
+    var knockCloud = '<g transform="translate(2.6,2.4) scale(0.92)"><path class="wi-cloud wi-knock" d="' + WI_CLOUD + '"/></g>';
+    switch (kind){
+      case 'clear-day':
+        s += '<circle class="wi-sun" cx="12" cy="12" r="4.4"/>' +
+             '<path class="wi-sun" d="M12 1.5v2M12 20.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M1.5 12h2M20.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/>';
+        break;
+      case 'clear-night':
+        s += '<path class="wi-moon" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+        break;
+      case 'part-day':
+        s += '<circle class="wi-sun" cx="6.2" cy="5.8" r="2.4"/>' +
+             '<path class="wi-sun" d="M6.2 1.2v1.4M1.6 5.8h1.4M2.7 2.3l1 1M9.7 2.3l-1 1"/>' + knockCloud;
+        break;
+      case 'part-night':
+        s += '<path class="wi-moon" d="M9.5 5.8A4.05 4.05 0 1 1 5.05 1.35a3.15 3.15 0 0 0 4.45 4.45z"/>' + knockCloud;
+        break;
+      case 'cloud':
+        s += '<path class="wi-cloud" d="' + WI_CLOUD + '"/>';
+        break;
+      case 'fog':
+        s += cloudHi + '<path class="wi-fog" d="M5.5 17h13M8 21h9"/>';
+        break;
+      case 'drizzle':
+        s += cloudHi + '<path class="wi-rain" d="M8 13v2M8 19v2M16 13v2M16 19v2M12 15v2M12 21v2"/>';
+        break;
+      case 'rain':
+        s += cloudHi + '<path class="wi-rain" d="M16 13v8M8 13v8M12 15v8"/>';
+        break;
+      case 'snow':
+        s += cloudHi + '<path class="wi-snow wi-flake" d="M8 14.2v4.8M5.92 15.4l4.16 2.4M5.92 17.8l4.16 -2.4M16 14.2v4.8M13.92 15.4l4.16 2.4M13.92 17.8l4.16 -2.4M12 19v4.8M9.92 20.2l4.16 2.4M9.92 22.6l4.16 -2.4"/>'; // three small snowflakes
+        break;
+      case 'sleet':
+        s += cloudHi + '<path class="wi-rain" d="M8 13v6M16 13v6"/>' +
+             '<path class="wi-snow" d="M12 17h.01M12 21h.01"/>';
+        break;
+      case 'thunder':
+        s += '<path class="wi-cloud" d="' + WI_BOLT_CLOUD + '"/>' +
+             '<polyline class="wi-bolt" points="13 11 9 17 15 17 11 23"/>';
+        break;
+      default:
+        s += '<path class="wi-cloud" d="' + WI_CLOUD + '"/>';
+    }
+    return s + '</svg>';
+  }
+
+  function nightify(kind, day){
+    if (day) return kind;
+    if (kind === 'clear-day') return 'clear-night';
+    if (kind === 'part-day') return 'part-night';
+    return kind;
+  }
+
+  // true if the given moment falls between today's sunrise and sunset
+  function isDayAt(d){
+    if (!lastSunrise || !lastSunset) return true;
+    function mins(x){
+      var p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Helsinki', hour: '2-digit', minute: '2-digit', hour12: false }).format(x).split(':');
+      return (parseInt(p[0], 10) % 24) * 60 + parseInt(p[1], 10); // some browsers say "24:05" for 00:05
+    }
+    var m = mins(d);
+    return m >= mins(new Date(lastSunrise)) && m <= mins(new Date(lastSunset));
+  }
+
+  // precip probability: thin bar always, numeric label only when it matters
+  function popMarkup(pop){
+    if (pop === null || typeof pop !== 'number' || isNaN(pop)) {
+      return '<div class="strip-item__pop"></div>';
+    }
+    var p = Math.max(0, Math.min(100, Math.round(pop)));
+    var num = p >= 30 ? p + '%' : '';
+    var fillOpacity = (0.35 + 0.65 * p / 100).toFixed(2);
+    return '<div class="strip-item__pop">' +
+      '<span class="pop-num">' + num + '</span>' +
+      '<span class="pop-bar"><i style="width:' + p + '%;opacity:' + fillOpacity + '"></i></span>' +
+      '</div>';
+  }
+
+  // "12<small>m/s</small>"; a dash if the value is missing
+  function withUnit(v, unit){
+    if (typeof v !== 'number' || isNaN(v)) return '&ndash;';
+    return Math.round(v) + '<span class="unit' + (unit === '%' ? ' unit--tight' : '') + '">' + unit + '</span>';
+  }
+
+  function degToCardinal(deg){
+    var dirs = ['N','NE','E','SE','S','SW','W','NW'];
+    return dirs[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+  }
+
+  /* ---------- Weather code -> icon kind / label ---------- */
+  function wmoInfo(code, isDay){
+    var day = isDay !== 0;
+    var map = {
+      0:  [day ? 'clear-day' : 'clear-night', 'Clear sky'],
+      1:  [day ? 'part-day' : 'part-night', 'Mainly clear'],
+      2:  [day ? 'part-day' : 'part-night', 'Partly cloudy'],
+      3:  ['cloud', 'Overcast'],
+      45: ['fog', 'Fog'],
+      48: ['fog', 'Freezing fog'],
+      51: ['drizzle', 'Light drizzle'],
+      53: ['drizzle', 'Drizzle'],
+      55: ['rain', 'Dense drizzle'],
+      56: ['sleet', 'Freezing drizzle'],
+      57: ['sleet', 'Freezing drizzle'],
+      61: ['rain', 'Light rain'],
+      63: ['rain', 'Rain'],
+      65: ['rain', 'Heavy rain'],
+      66: ['sleet', 'Freezing rain'],
+      67: ['sleet', 'Freezing rain'],
+      71: ['snow', 'Light snow'],
+      73: ['snow', 'Snow'],
+      75: ['snow', 'Heavy snow'],
+      77: ['snow', 'Snow grains'],
+      80: ['drizzle', 'Light showers'],
+      81: ['rain', 'Showers'],
+      82: ['thunder', 'Violent showers'],
+      85: ['snow', 'Snow showers'],
+      86: ['snow', 'Heavy snow showers'],
+      95: ['thunder', 'Thunderstorm'],
+      96: ['thunder', 'Thunderstorm, hail'],
+      99: ['thunder', 'Thunderstorm, hail']
+    };
+    if (map[code]) return map[code];
+    return ['cloud', '\u2014'];
+  }
+
+  function fmtTime(d){
+    return d.toLocaleTimeString('en-GB', { timeZone:'Europe/Helsinki', hour:'2-digit', minute:'2-digit' });
+  }
+
+  /* ---------- Clock ---------- */
+  function tickClock(){
+    var now = new Date();
+    var p = now.toLocaleTimeString('en-GB', { timeZone:'Europe/Helsinki', hour:'2-digit', minute:'2-digit', second:'2-digit' }).split(':');
+    var weekday = now.toLocaleDateString('en-GB', { timeZone:'Europe/Helsinki', weekday:'long' });
+    var dayMonth = now.toLocaleDateString('en-GB', { timeZone:'Europe/Helsinki', day:'numeric', month:'long' });
+    document.getElementById('clockTime').innerHTML = p[0] + ':' + p[1] + '<span class="clock__sec">' + p[2] + '</span>';
+    document.getElementById('clockDate').innerHTML =
+      '<span class="clock__weekday">' + weekday + '</span> <span class="clock__daymonth">' + dayMonth + '</span>';
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ---------- Map ---------- */
+  // NOTE: the radar layer below uses FMI's WMS "View Service" for EVALUATION
+  // purposes, per FMI's own open-data terms (their WMS is licensed for
+  // evaluation/preview, not for embedding in a continuously-polling
+  // production app). Fine for a single personal device; if this becomes a
+  // permanent 24/7 install, consider reverting to RainViewer.
+  var map = L.map('map', {
+    zoomControl: false,
+    attributionControl: false,  // credits are shown in the footer instead
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    touchZoom: false,
+    boxZoom: false,
+    dragging: false,
+    keyboard: false,
+    minZoom: 6,
+    maxZoom: 12
+  }).setView([LAT, LON], 9);
+
+
+  // place names on their own pane, above the radar echoes
+  map.createPane('labels');
+  map.getPane('labels').style.zIndex = 450;
+  map.getPane('labels').style.pointerEvents = 'none';
+
+  // Esri Dark Gray Canvas basemap (no API key needed)
+  var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+  L.tileLayer(ESRI + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 16,
+    className: 'base-tiles',
+    attribution: 'Tiles &copy; Esri'
+  }).addTo(map);
+  L.tileLayer(ESRI + 'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 16,
+    pane: 'labels',
+    className: 'label-tiles'
+  }).addTo(map);
+
+  L.circleMarker([LAT, LON], {
+    radius: 6,
+    color: '#F4A94A',
+    weight: 2,
+    fillColor: '#F4A94A',
+    fillOpacity: 0.85
+  }).addTo(map).bindTooltip('Lassila');
+
+  // Leaflet computes its center from the container size at init time. If the
+  // CSS grid/fonts haven't finished settling yet, that size can be briefly
+  // wrong, leaving the map looking off-center (e.g. the marker sitting near
+  // an edge instead of the middle). Force a recheck + re-center once things
+  // have actually settled, and again on any resize/orientation change.
+  function recenterMap(){
+    map.invalidateSize();
+    map.setView([LAT, LON], map.getZoom());
+  }
+  setTimeout(recenterMap, 300);
+  setTimeout(recenterMap, 1200);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(recenterMap);
+  }
+  window.addEventListener('resize', recenterMap);
+  window.addEventListener('orientationchange', function(){ setTimeout(recenterMap, 300); });
+
+  var FMI_WMS_URL = 'https://openwms.fmi.fi/geoserver/wms';
+  var FMI_LAYER = 'Radar:suomi_dbz_eureffin';
+  var RADAR_OPACITY = 0.75;
+
+  // One Leaflet layer per radar frame. Each frame's tiles are downloaded ONCE;
+  // the animation just shows/hides already-loaded layers. (The previous
+  // version re-pointed two layers at a new time every 0.7 s, which re-fetched
+  // ~a dozen tiles per step, all day long.)
+  var radarFrames = [];   // [{ time: Date, layer: L.TileLayer.WMS, ready: bool }]
+  var radarIndex = -1;    // index of the frame currently on screen
+  var shownFrame = null;
+  var holdTicks = 0;      // extra ticks to linger on the newest frame
+
+  // FMI rate-limits its WMS (HTTP 429, roughly 600 requests / 5 min). 512 px
+  // tiles mean ~4x fewer requests than Leaflet's default 256 px. A frame with
+  // any failed tile is never shown (it would appear as an empty map) and is
+  // re-requested only at the next 5-minute refresh, so a 429 never turns
+  // into a retry loop.
+  function makeRadarFrame(t){
+    var f = { time: t, ready: false, failed: false, done: false, layer: null };
+    f.layer = L.tileLayer.wms(FMI_WMS_URL, {
+      layers: FMI_LAYER,
+      format: 'image/png',
+      transparent: true,
+      version: '1.1.1',
+      time: isoNoMillis(t),
+      tileSize: 512,
+      opacity: 0,
+      className: 'radar-frame',
+      attribution: 'Radar: FMI'
+    });
+    f.layer.on('tileerror', function(){ f.failed = true; });
+    f.layer.on('load', function(){ f.done = true; f.ready = !f.failed; });
+    f.layer.addTo(map);
+    return f;
+  }
+
+  // FMI's composite radar updates every 5 minutes; build a short trailing
+  // window of timestamps ourselves (no separate frame-list API needed).
+  function buildFrameTimes(){
+    var now = new Date();
+    var flooredMs = now.getTime() - (now.getTime() % (5 * 60 * 1000));
+    var offsets = [25, 20, 15, 10, 5, 0]; // minutes ago
+    var frames = [];
+    for (var i = 0; i < offsets.length; i++){
+      var t = new Date(flooredMs - offsets[i] * 60 * 1000);
+      frames.push(t);
+    }
+    return frames;
+  }
+
+  function isoNoMillis(d){
+    return d.toISOString().replace(/\.\d+Z$/, 'Z');
+  }
+
+  function showRadarFrame(idx){
+    var f = radarFrames[idx];
+    if (shownFrame && shownFrame !== f) shownFrame.layer.setOpacity(0);
+    f.layer.setOpacity(RADAR_OPACITY);   // CSS transition on .radar-frame = crossfade
+    shownFrame = f;
+    radarIndex = idx;
+    var isLatest = idx === radarFrames.length - 1;
+    document.getElementById('radarTime').innerHTML =
+      (isLatest ? '<b>Now</b>' : '') + fmtTime(f.time);
+  }
+
+  // Step to the next frame whose tiles have finished loading.
+  function advanceRadar(){
+    if (radarFrames.length === 0) return;
+    if (holdTicks > 0) { holdTicks--; return; }
+    for (var step = 1; step <= radarFrames.length; step++){
+      var idx = (radarIndex + step) % radarFrames.length;
+      if (radarFrames[idx].ready){
+        showRadarFrame(idx);
+        if (idx === radarFrames.length - 1) holdTicks = 3; // linger ~2.8 s on "Now"
+        return;
+      }
+    }
+    // Nothing usable to show. Once every frame has finished trying, say so.
+    if (!shownFrame){
+      var allDone = true;
+      for (var i = 0; i < radarFrames.length; i++) if (!radarFrames[i].done) allDone = false;
+      if (allDone) document.getElementById('radarTime').textContent = 'Radar unavailable · retrying';
+    }
+  }
+
+  // Rebuild the frame window, reusing layers for times we already have, so
+  // each 5-minute refresh downloads only the one new frame.
+  function loadRadar(){
+    var times = buildFrameTimes();
+    var old = {};
+    for (var i = 0; i < radarFrames.length; i++) old[radarFrames[i].time.getTime()] = radarFrames[i];
+    var next = [];
+    for (var j = 0; j < times.length; j++){
+      var key = times[j].getTime();
+      // reuse good frames; frames that failed are dropped below and re-requested
+      if (old[key] && !old[key].failed) { next.push(old[key]); delete old[key]; }
+      else next.push(makeRadarFrame(times[j]));
+    }
+    for (var k in old){
+      if (!old.hasOwnProperty(k)) continue;
+      if (old[k] === shownFrame) shownFrame = null;
+      map.removeLayer(old[k].layer);
+    }
+    radarFrames = next;
+    radarIndex = shownFrame ? radarFrames.indexOf(shownFrame) : -1;
+  }
+
+  loadRadar();
+  setInterval(loadRadar, 5 * 60 * 1000);       // slide the frame window every 5 min
+  setInterval(advanceRadar, 700);              // step the animation
+
+  /* ---------- FMI WFS helpers ---------- */
+  // Note: unlike the WMS radar imagery above, FMI's WFS "Download Service"
+  // (used below for lightning, live observations and forecast) is explicitly
+  // intended for continuous use by applications, per FMI's open data terms.
+  var FMI_WFS_URL = 'https://opendata.fmi.fi/wfs';
+
+  function buildFmiUrl(storedQueryId, extraParams){
+    var url = FMI_WFS_URL + '?service=WFS&version=2.0.0&request=getFeature&storedquery_id=' + encodeURIComponent(storedQueryId);
+    for (var key in extraParams){
+      if (extraParams.hasOwnProperty(key)){
+        url += '&' + key + '=' + encodeURIComponent(extraParams[key]);
+      }
+    }
+    return url;
+  }
+
+  // Rejects on HTTP errors and on FMI's XML ExceptionReport, so callers'
+  // .catch() runs instead of silently treating an error as "no data".
+  function fetchFmiXml(url){
+    return fetch(url).then(function(r){
+      if (!r.ok) throw new Error('FMI HTTP ' + r.status);
+      return r.text();
+    }).then(function(text){
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(text, 'text/xml');
+      if (doc.getElementsByTagName('parsererror').length ||
+          doc.getElementsByTagName('ExceptionReport').length ||
+          doc.getElementsByTagName('ows:ExceptionReport').length) {
+        throw new Error('FMI exception');
+      }
+      return doc;
+    });
+  }
+
+  // Parses FMI's "simple feature" WFS format: a flat list of
+  // <BsWfs:BsWfsElement> rows, one per (location, time, parameter).
+  function parseBsWfsElements(doc){
+    var elements = doc.getElementsByTagName('BsWfs:BsWfsElement');
+    var rows = [];
+    for (var i = 0; i < elements.length; i++){
+      var el = elements[i];
+      var timeEl = el.getElementsByTagName('BsWfs:Time')[0];
+      var posEl = el.getElementsByTagName('gml:pos')[0];
+      var nameEl = el.getElementsByTagName('BsWfs:ParameterName')[0];
+      var valEl = el.getElementsByTagName('BsWfs:ParameterValue')[0];
+      if (!timeEl || !nameEl || !valEl) continue;
+      var lat = null, lon = null;
+      if (posEl) {
+        var parts = posEl.textContent.trim().split(/\s+/);
+        lat = parseFloat(parts[0]);
+        lon = parseFloat(parts[1]);
+      }
+      rows.push({
+        time: timeEl.textContent,
+        lat: lat,
+        lon: lon,
+        name: nameEl.textContent,
+        value: parseFloat(valEl.textContent)
+      });
+    }
+    return rows;
+  }
+
+  /* ---------- Lightning ---------- */
+  var lightningLayer = L.layerGroup().addTo(map);
+
+  function loadLightning(){
+    var end = new Date();
+    var start = new Date(end.getTime() - 60 * 60 * 1000);
+    var url = buildFmiUrl('fmi::observations::lightning::simple', {
+      bbox: '18,58,32,66',
+      starttime: isoNoMillis(start),
+      endtime: isoNoMillis(end)
+    });
+    fetchFmiXml(url).then(function(doc){
+      var rows = parseBsWfsElements(doc);
+      var groups = {};
+      for (var i = 0; i < rows.length; i++){
+        var r = rows[i];
+        if (r.lat === null || isNaN(r.lat)) continue;
+        var key = r.time + '|' + r.lat.toFixed(3) + ',' + r.lon.toFixed(3);
+        if (!groups[key]) groups[key] = { time: r.time, lat: r.lat, lon: r.lon, params: {} };
+        groups[key].params[r.name] = r.value;
+      }
+      var strikes = [];
+      for (var k in groups){ if (groups.hasOwnProperty(k)) strikes.push(groups[k]); }
+      renderLightning(strikes);
+    }).catch(function(){
+      document.getElementById('lightningCount').innerHTML = ZAP_MINI + '<span>unavailable</span>';
+    });
+  }
+
+  // Distance in km between two lat/lon points (haversine formula)
+  function haversineKm(lat1, lon1, lat2, lon2){
+    var R = 6371;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLon = (lon2 - lon1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  var LIGHTNING_ALERT_RADIUS_KM = 20;
+  var LIGHTNING_ALERT_WINDOW_MIN = 30; // standard "wait before it's safe" window
+
+  function updateLightningAlert(strikes){
+    var now = Date.now();
+    var nearest = null;
+    for (var i = 0; i < strikes.length; i++){
+      var s = strikes[i];
+      var ageMin = (now - new Date(s.time).getTime()) / 60000;
+      if (ageMin < 0 || ageMin > LIGHTNING_ALERT_WINDOW_MIN) continue;
+      var dist = haversineKm(LAT, LON, s.lat, s.lon);
+      if (dist <= LIGHTNING_ALERT_RADIUS_KM && (!nearest || dist < nearest.dist)){
+        nearest = { dist: dist, ageMin: ageMin };
+      }
+    }
+    var el = document.getElementById('lightningAlert');
+    if (nearest){
+      el.classList.add('active');
+      document.getElementById('lightningAlertText').textContent =
+        'Lightning within ' + LIGHTNING_ALERT_RADIUS_KM + ' km';
+      var ageLabel = nearest.ageMin < 1 ? 'just now' : Math.round(nearest.ageMin) + ' min ago';
+      document.getElementById('lightningAlertSub').textContent =
+        'Nearest strike ' + nearest.dist.toFixed(1) + ' km away \u00B7 ' + ageLabel;
+    } else {
+      el.classList.remove('active');
+    }
+  }
+
+  function renderLightning(strikes){
+    lightningLayer.clearLayers();
+    var now = Date.now();
+    var shown = 0;
+    for (var i = 0; i < strikes.length; i++){
+      var s = strikes[i];
+      var ageMin = (now - new Date(s.time).getTime()) / 60000;
+      if (ageMin < 0 || ageMin > 60) continue;
+      shown++;
+      var fade = Math.max(0.15, 1 - ageMin / 60);
+      var isCloud = s.params.cloud_indicator === 1;
+      var color = isCloud ? '#B892FF' : '#FFE066';
+      var peak = s.params.peak_current;
+      var radius = 5;
+      if (typeof peak === 'number' && !isNaN(peak)) {
+        radius = Math.min(11, 4 + Math.abs(peak) / 15);
+      }
+      L.circleMarker([s.lat, s.lon], {
+        radius: radius,
+        color: color,
+        weight: 1,
+        fillColor: color,
+        fillOpacity: fade,
+        opacity: fade
+      }).addTo(lightningLayer);
+    }
+    document.getElementById('lightningCount').innerHTML = ZAP_MINI + '<span>' + shown + ' / 60 min</span>';
+    updateLightningAlert(strikes);
+  }
+
+  loadLightning();
+  setInterval(loadLightning, 2 * 60 * 1000);
+
+  /* ---------- FMI symbol -> icon kind (used by hourly/daily strip upgrade) ---------- */
+  // FMI WeatherSymbol3 table:
+  //  1 clear, 2 partly cloudy, 3 cloudy,
+  //  21-23 rain showers, 31-33 rain,
+  //  41-43 SNOW showers, 51-53 snowfall,
+  //  61-64 thunder, 71-73 sleet showers, 81-83 sleet, 91-92 mist/fog
+  function fmiSymbolIcon(code){
+    if (typeof code !== 'number' || isNaN(code)) return 'cloud';
+    var c = code % 100; // ignore any day/night offset variants
+    if (c === 1) return 'clear-day';
+    if (c === 2) return 'part-day';
+    if (c === 3) return 'cloud';
+    if (c === 21) return 'drizzle';
+    if (c >= 22 && c <= 23) return 'rain';
+    if (c >= 31 && c <= 33) return 'rain';
+    if (c >= 41 && c <= 43) return 'snow';
+    if (c >= 51 && c <= 53) return 'snow';
+    if (c >= 61 && c <= 64) return 'thunder';
+    if (c >= 71 && c <= 73) return 'sleet';
+    if (c >= 81 && c <= 83) return 'sleet';
+    if (c >= 91 && c <= 92) return 'fog';
+    return 'cloud';
+  }
+
+  /* ---------- Sunrise / sunset (header) + day/night tint ---------- */
+  var lastSunrise = null;
+  var lastSunset = null;
+
+  // Open-Meteo returns naive Helsinki wall-clock strings ("2026-11-20T08:43").
+  // new Date() on those uses the DEVICE's timezone, which is wrong on a device
+  // set to UTC. Use the utc_offset_seconds Open-Meteo sends instead.
+  function omDate(s, offsetSec){
+    if (typeof offsetSec !== 'number') return new Date(s);
+    var iso = s.length === 16 ? s + ':00Z' : s + 'Z';
+    return new Date(Date.parse(iso) - offsetSec * 1000);
+  }
+
+  function updateSunArc(sunrise, sunset){
+    lastSunrise = sunrise;
+    lastSunset = sunset;
+    var now = new Date();
+
+    document.getElementById('headerSunrise').textContent = fmtTime(sunrise);
+    document.getElementById('headerSunset').textContent = fmtTime(sunset);
+
+    updateTint(now, sunrise, sunset);
+  }
+
+  /* ---------- Day / night tint ---------- */
+  function updateTint(now, sunrise, sunset){
+    var duskWindow = 45 * 60 * 1000; // 45 min soft transition either side
+    var t = now.getTime();
+    var nightFactor;
+
+    if (t < sunrise.getTime() - duskWindow || t > sunset.getTime() + duskWindow) {
+      nightFactor = 1;
+    } else if (t < sunrise.getTime() + duskWindow) {
+      nightFactor = 1 - (t - (sunrise.getTime() - duskWindow)) / (2 * duskWindow);
+    } else if (t < sunset.getTime() - duskWindow) {
+      nightFactor = 0;
+    } else {
+      nightFactor = (t - (sunset.getTime() - duskWindow)) / (2 * duskWindow);
+    }
+    if (nightFactor < 0) nightFactor = 0;
+    if (nightFactor > 1) nightFactor = 1;
+
+    var duskFactor = nightFactor * (1 - nightFactor) * 4; // peaks at 1 around the transition zones
+
+    document.getElementById('nightTint').style.opacity = (nightFactor * 0.85).toFixed(2);
+    document.getElementById('duskTint').style.opacity = (duskFactor * 0.9).toFixed(2);
+  }
+
+  /* ---------- Weather data ---------- */
+  var WEATHER_URL = 'https://api.open-meteo.com/v1/forecast'
+    + '?latitude=' + LAT + '&longitude=' + LON
+    + '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,is_day'
+    + '&hourly=temperature_2m,precipitation_probability,weather_code'
+    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset'
+    + '&timezone=Europe%2FHelsinki&forecast_days=7&wind_speed_unit=ms';
+
+  // Builds a "YYYY-MM-DDTHH" prefix for the current moment in Europe/Helsinki
+  // wall-clock time, matching Open-Meteo's naive local timestamps exactly —
+  // regardless of what timezone the device itself is set to.
+  function helsinkiHourPrefixNow(){
+    var fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Helsinki',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', hour12: false
+    });
+    var parts = fmt.formatToParts(new Date());
+    var obj = {};
+    for (var i = 0; i < parts.length; i++){ obj[parts[i].type] = parts[i].value; }
+    var hh = obj.hour === '24' ? '00' : obj.hour;
+    return obj.year + '-' + obj.month + '-' + obj.day + 'T' + hh;
+  }
+
+  function renderHourly(hourly, offsetSec){
+    var container = document.getElementById('hourlyStrip');
+    container.innerHTML = '';
+    var nowPrefix = helsinkiHourPrefixNow();
+    var startIdx = 0;
+    for (var i = 0; i < hourly.time.length; i++){
+      if (hourly.time[i].slice(0,13) >= nowPrefix) { startIdx = i; break; }
+    }
+    var count = 0;
+    for (var j = startIdx; j < hourly.time.length && count < 9; j++, count++){
+      var t = omDate(hourly.time[j], offsetSec);
+      var info = wmoInfo(hourly.weather_code[j], isDayAt(t) ? 1 : 0);
+      var item = document.createElement('div');
+      item.className = count === 0 ? 'strip-item is-now' : 'strip-item';
+      item.innerHTML =
+        '<div class="strip-item__label">' + (count === 0 ? 'Now' : fmtTime(t)) + '</div>' +
+        '<div class="strip-item__icon">' + svgIcon(info[0]) + '</div>' +
+        '<div class="strip-item__temp">' + Math.round(hourly.temperature_2m[j]) + '&deg;</div>' +
+        popMarkup(hourly.precipitation_probability[j]);
+      container.appendChild(item);
+    }
+  }
+
+  function renderDaily(daily){
+    var container = document.getElementById('dailyStrip');
+    container.innerHTML = '';
+    var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    for (var i = 0; i < daily.time.length && i < 7; i++){
+      var d = new Date(daily.time[i] + 'T12:00:00');
+      var info = wmoInfo(daily.weather_code[i], 1);
+      var label = i === 0 ? 'Today' : dayNames[d.getDay()];
+      var item = document.createElement('div');
+      item.className = label === 'Today' ? 'strip-item is-now' : 'strip-item';
+      item.innerHTML =
+        '<div class="strip-item__label">' + label + '</div>' +
+        '<div class="strip-item__icon">' + svgIcon(info[0]) + '</div>' +
+        '<div class="strip-item__temp"><span class="strip-item__temp-max">' + Math.round(daily.temperature_2m_max[i]) + '&deg;</span>' +
+        ' <span class="strip-item__temp-min">' + Math.round(daily.temperature_2m_min[i]) + '&deg;</span></div>' +
+        popMarkup(daily.precipitation_probability_max[i]);
+      container.appendChild(item);
+    }
+  }
+
+  var weatherTimer = null;
+  var lastWeatherOkAt = 0;
+
+  // A single timer: 10 min after success, 1 min after a failure. (A plain
+  // setInterval would wait the full 10 minutes to retry.)
+  function scheduleWeather(ms){
+    clearTimeout(weatherTimer);
+    weatherTimer = setTimeout(loadWeather, ms);
+  }
+
+  function hhmm(ms){
+    return new Date(ms).toLocaleTimeString('en-GB', { timeZone:'Europe/Helsinki', hour:'2-digit', minute:'2-digit' });
+  }
+
+  function loadWeather(){
+    // FMI strips are fetched independently, so they still appear if
+    // Open-Meteo is down.
+    loadFmiForecastStrips();
+
+    fetch(WEATHER_URL)
+      .then(function(r){
+        if (!r.ok) throw new Error('Open-Meteo HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data){
+        var off = data.utc_offset_seconds;
+        var cur = data.current;
+        var info = wmoInfo(cur.weather_code, cur.is_day);
+
+        document.getElementById('curIcon').innerHTML = svgIcon(info[0]);
+        document.getElementById('curCond').textContent = info[1];
+        document.getElementById('curTemp').innerHTML = Math.round(cur.temperature_2m) + '&deg;';
+        document.getElementById('curFeels').innerHTML = Math.round(cur.apparent_temperature) + '&deg;';
+
+        var windHtml = withUnit(cur.wind_speed_10m, 'm/s');
+        if (typeof cur.wind_direction_10m === 'number' && !isNaN(cur.wind_direction_10m)){
+          var blowTo = Math.round((cur.wind_direction_10m + 180) % 360);
+          windHtml += '<i class="wind-arrow" style="transform:rotate(' + blowTo + 'deg)">&#8593;</i><span class="wind-dir">' + degToCardinal(cur.wind_direction_10m) + '</span>';
+        }
+        document.getElementById('curWind').innerHTML = windHtml;
+        document.getElementById('curGust').innerHTML = withUnit(cur.wind_gusts_10m, 'm/s');
+        document.getElementById('curHumidity').innerHTML = withUnit(cur.relative_humidity_2m, '%');
+        document.getElementById('curPressure').innerHTML = withUnit(cur.pressure_msl, 'hPa');
+
+        // sun times first, so hourly icons can pick day/night variants
+        updateSunArc(omDate(data.daily.sunrise[0], off), omDate(data.daily.sunset[0], off));
+        // Open-Meteo strips are only a fallback: paint them if FMI hasn't
+        // succeeded recently, otherwise the strips would flip between the two
+        // sources every refresh.
+        if (Date.now() - fmiStripsOkAt > 30 * 60 * 1000) {
+          renderHourly(data.hourly, off);
+          renderDaily(data.daily);
+        } else if (pendingFmiHourly) {
+          renderHourlyFmi(pendingFmiHourly.byTime, pendingFmiHourly.times);
+          pendingFmiHourly = null;
+        }
+
+        lastWeatherOkAt = Date.now();
+        document.getElementById('updatedAt').textContent = 'Updated ' + hhmm(lastWeatherOkAt);
+        scheduleWeather(10 * 60 * 1000);
+      })
+      .catch(function(){
+        // Say how old the numbers on screen are, and retry soon.
+        document.getElementById('updatedAt').textContent = lastWeatherOkAt
+          ? 'Update failed \u00b7 showing data from ' + hhmm(lastWeatherOkAt) + ' \u00b7 retrying\u2026'
+          : 'Update failed \u2014 retrying\u2026';
+        scheduleWeather(60 * 1000);
+      });
+  }
+
+  /* ---------- FMI edited-weather forecast (upgrades hourly/daily strips) ---------- */
+  var fmiStripsOkAt = 0;
+  var pendingFmiHourly = null;
+
+  // Start of today (00:00) in Helsinki, as a Date
+  function helsinkiMidnight(){
+    var now = new Date();
+    var p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Helsinki', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now).split(':');
+    var h = parseInt(p[0], 10) % 24, m = parseInt(p[1], 10), s = parseInt(p[2], 10);
+    return new Date(now.getTime() - ((h * 60 + m) * 60 + s) * 1000 - now.getMilliseconds());
+  }
+
+  function helsinkiDateKey(d){
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Helsinki', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  }
+
+  function helsinkiHour(d){
+    return parseInt(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Helsinki', hour: '2-digit', hour12: false }).format(d), 10) % 24;
+  }
+
+  function renderHourlyFmi(byTime, futureTimes){
+    var container = document.getElementById('hourlyStrip');
+    container.innerHTML = '';
+    var count = 0;
+    for (var j = 0; j < futureTimes.length && count < 9; j++, count++){
+      var iso = futureTimes[j];
+      var d = new Date(iso);
+      var entry = byTime[iso];
+      var icon = svgIcon(nightify(fmiSymbolIcon(entry.WeatherSymbol3), isDayAt(d)));
+      var temp = Math.round(entry.Temperature);
+      var pop = (typeof entry.PoP === 'number') ? Math.round(entry.PoP) : null;
+      var item = document.createElement('div');
+      item.className = count === 0 ? 'strip-item is-now' : 'strip-item';
+      item.innerHTML =
+        '<div class="strip-item__label">' + (count === 0 ? 'Now' : fmtTime(d)) + '</div>' +
+        '<div class="strip-item__icon">' + icon + '</div>' +
+        '<div class="strip-item__temp">' + temp + '&deg;</div>' +
+        popMarkup(pop);
+      container.appendChild(item);
+    }
+  }
+
+  function renderDailyFmi(byTime, futureTimes){
+    var byDay = {};
+    var order = [];
+    for (var i = 0; i < futureTimes.length; i++){
+      var iso = futureTimes[i];
+      var d = new Date(iso);
+      var key = helsinkiDateKey(d);
+      if (!byDay[key]) { byDay[key] = { temps: [], pops: [], symbol: null, symbolDist: -1 }; order.push(key); }
+      var entry = byTime[iso];
+      if (typeof entry.Temperature === 'number') byDay[key].temps.push(entry.Temperature);
+      if (typeof entry.PoP === 'number') byDay[key].pops.push(entry.PoP);
+      if (typeof entry.WeatherSymbol3 === 'number'){
+        var dist = Math.abs(helsinkiHour(d) - 14); // pick the symbol nearest early afternoon
+        if (byDay[key].symbolDist === -1 || dist < byDay[key].symbolDist){
+          byDay[key].symbol = entry.WeatherSymbol3;
+          byDay[key].symbolDist = dist;
+        }
+      }
+    }
+
+    var container = document.getElementById('dailyStrip');
+    container.innerHTML = '';
+    var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var todayKey = helsinkiDateKey(new Date());
+    var count = 0;
+    for (var k = 0; k < order.length && count < 7; k++){
+      var key = order[k];
+      var day = byDay[key];
+      if (day.temps.length === 0) continue;
+      count++;
+      var max = Math.max.apply(null, day.temps);
+      var min = Math.min.apply(null, day.temps);
+      var pop = day.pops.length ? Math.round(Math.max.apply(null, day.pops)) : null;
+      var icon = svgIcon(fmiSymbolIcon(day.symbol));
+      var parts = key.split('-');
+      var dateObj = new Date(parseInt(parts[0],10), parseInt(parts[1],10) - 1, parseInt(parts[2],10));
+      var label = key === todayKey ? 'Today' : dayNames[dateObj.getDay()];
+      var item = document.createElement('div');
+      item.className = label === 'Today' ? 'strip-item is-now' : 'strip-item';
+      item.innerHTML =
+        '<div class="strip-item__label">' + label + '</div>' +
+        '<div class="strip-item__icon">' + icon + '</div>' +
+        '<div class="strip-item__temp"><span class="strip-item__temp-max">' + Math.round(max) + '&deg;</span>' +
+        ' <span class="strip-item__temp-min">' + Math.round(min) + '&deg;</span></div>' +
+        popMarkup(pop);
+      container.appendChild(item);
+    }
+  }
+
+  function loadFmiForecastStrips(){
+    var end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    var url = buildFmiUrl('fmi::forecast::edited::weather::scandinavia::point::simple', {
+      place: 'Lassila,Helsinki',
+      parameters: 'Temperature,WeatherSymbol3,PoP',
+      timestep: 60,
+      starttime: isoNoMillis(helsinkiMidnight()), // so "Today" gets a full-day min/max
+      endtime: isoNoMillis(end)
+    });
+    fetchFmiXml(url).then(function(doc){
+      var rows = parseBsWfsElements(doc);
+      if (rows.length === 0) return;
+      var byTime = {};
+      for (var i = 0; i < rows.length; i++){
+        var r = rows[i];
+        if (isNaN(r.value)) continue;
+        if (!byTime[r.time]) byTime[r.time] = {};
+        byTime[r.time][r.name] = r.value;
+      }
+      var times = [];
+      for (var t in byTime){
+        if (byTime.hasOwnProperty(t) && typeof byTime[t].Temperature === 'number') times.push(t);
+      }
+      times.sort();
+      // Hourly strip starts at the CURRENT hour (so "Now" really is now),
+      // not the next whole hour.
+      var hourStartMs = Date.now() - (Date.now() % (60 * 60 * 1000));
+      var hourStartIso = isoNoMillis(new Date(hourStartMs));
+      var fromNow = [];
+      for (var j = 0; j < times.length; j++){ if (times[j] >= hourStartIso) fromNow.push(times[j]); }
+      if (fromNow.length === 0) return;
+
+      renderHourlyFmi(byTime, fromNow);
+      renderDailyFmi(byTime, times); // all of today from midnight, for a true daily min/max
+      fmiStripsOkAt = Date.now();
+      // If this arrived before Open-Meteo's sunrise/sunset, redraw once they're
+      // known so night hours don't get sun icons.
+      pendingFmiHourly = lastSunrise ? null : { byTime: byTime, times: fromNow };
+      // (The footer's "Updated" time tracks the current-conditions panel only.)
+    }).catch(function(){ /* Open-Meteo strips (if any) stay as-is */ });
+  }
+
+  /* ---------- Trains from Pohjois-Haaga (Fintraffic Digitraffic: free, no key) ---------- */
+  // Station POH = Pohjois-Haaga. I trains run straight to Helsinki; P trains go
+  // the other way round the ring via the airport. Direction is read from each
+  // train's remaining stops, so it stays right even if lines change.
+  var TRAIN_STATION = 'POH';
+  var TRAINS_REQUESTED = 20;
+  var TRAIN_URL = 'https://rata.digitraffic.fi/api/v1/live-trains/station/' + TRAIN_STATION +
+    '?arrived_trains=0&arriving_trains=0&departed_trains=0&departing_trains=' + TRAINS_REQUESTED + '&include_nonstopping=false';
+  var DIGITRAFFIC_USER = 'weatherlassila/1.4'; // Fintraffic asks apps to identify themselves
+  var TIMES_PER_DIRECTION = 2;
+  var NIGHT_GAP_MS = 90 * 60 * 1000;   // a gap this long means "last train" / "first train"
+  var DIRECTION_ORDER = ['Helsinki', 'Airport'];
+  var STATION_NAMES = { HKI: 'Helsinki', PSL: 'Pasila', HPL: 'Huopalahti', KAN: 'Kannelmäki',
+    MLO: 'Malminkartano', MYR: 'Myyrmäki', VKS: 'Vantaankoski', LEN: 'Airport', TKL: 'Tikkurila' };
+
+  var trainDepartures = [];   // [{ line, dest, ms, sched, cancelled }]
+  var trainsOkAt = 0;
+  var trainsFailed = false;
+  var trainsTimer = null;
+  var sendUserHeader = true;  // dropped once if the browser refuses the custom header
+
+  function fetchTrains(){
+    var opts = sendUserHeader ? { headers: { 'Digitraffic-User': DIGITRAFFIC_USER } } : {};
+    return fetch(TRAIN_URL, opts)
+      .catch(function(err){
+        if (!sendUserHeader) throw err;
+        // Retry without the header. Only stop sending it if that works, so a
+        // Wi-Fi blip doesn't make the dashboard anonymous until a reload.
+        return fetch(TRAIN_URL).then(function(r){ sendUserHeader = false; return r; });
+      })
+      .then(function(r){
+        if (!r.ok) throw new Error('Digitraffic HTTP ' + r.status);
+        return r.json();
+      });
+  }
+
+  function parseTrains(trains){
+    var out = [];
+    for (var i = 0; i < trains.length; i++){
+      var tr = trains[i];
+      var rows = tr.timeTableRows || [];
+      var k = -1;
+      for (var j = 0; j < rows.length; j++){
+        if (rows[j].stationShortCode === TRAIN_STATION && rows[j].type === 'DEPARTURE') { k = j; break; }
+      }
+      if (k < 0) continue;
+      var row = rows[k];
+      if (row.trainStopping === false || row.commercialStop === false) continue;
+      if (row.actualTime) continue;          // already left
+      var sched = Date.parse(row.scheduledTime);
+      var ms = Date.parse(row.liveEstimateTime || row.scheduledTime);
+      if (isNaN(ms) || isNaN(sched)) continue;
+      var toAirport = false;
+      for (var m = k + 1; m < rows.length; m++){
+        if (rows[m].stationShortCode === 'LEN') { toAirport = true; break; }
+      }
+      var last = rows.length ? rows[rows.length - 1].stationShortCode : '';
+      out.push({
+        line: String(tr.commuterLineID || tr.trainType || '').slice(0, 3),
+        dest: toAirport ? 'Airport' : (STATION_NAMES[last] || last),
+        ms: ms,            // best estimate (live if available)
+        sched: sched,      // timetable time
+        cancelled: !!(tr.cancelled || row.cancelled)
+      });
+    }
+    out.sort(function(a, b){ return a.ms - b.ms; });
+    return out;
+  }
+
+  function renderTrains(){
+    var el = document.getElementById('trainList');
+    var now = Date.now();
+    if ((trainsOkAt && now - trainsOkAt > 10 * 60 * 1000) || (!trainsOkAt && trainsFailed)) {
+      el.innerHTML = '<span class="dep-empty">Train times unavailable · retrying</span>';
+      return;
+    }
+    // Group the upcoming departures by direction (Helsinki first, then Airport).
+    var groups = {}, order = [];
+    for (var i = 0; i < trainDepartures.length; i++){
+      var d = trainDepartures[i];
+      if (d.ms <= now - 30 * 1000) continue;            // gone
+      if (!groups[d.dest]) { groups[d.dest] = { dest: d.dest, line: d.line, items: [] }; order.push(d.dest); }
+      groups[d.dest].items.push(d);
+    }
+    if (!order.length) {
+      el.innerHTML = '<span class="dep-empty">' + (trainsOkAt ? 'No more trains tonight' : 'Loading trains…') + '</span>';
+      return;
+    }
+    order.sort(function(a, b){
+      var ia = DIRECTION_ORDER.indexOf(a), ib = DIRECTION_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+
+    var html = '';
+    for (var g = 0; g < order.length; g++){
+      var grp = groups[order[g]];
+      html += '<div class="dep-group">' +
+        '<span class="dep__line">' + grp.line.replace(/[^A-Za-z0-9]/g, '') + '</span>' +
+        '<span class="dep__dest">' + grp.dest.replace(/[<>&]/g, '') + '</span>';
+      for (var k = 0; k < grp.items.length && k < TIMES_PER_DIRECTION; k++){
+        var it = grp.items[k];
+        var prev = grp.items[k - 1];
+        var next = grp.items[k + 1];
+        // "First": a long gap before it (overnight break, or still far off this morning).
+        var gapBefore = prev ? it.sched - prev.sched : it.ms - now;
+        var isFirst = gapBefore > NIGHT_GAP_MS;
+        // "Last": the next train this way is only after a long gap. Only labelled when
+        // that next train is actually in the data, so nothing is guessed.
+        var isLast = !isFirst && !!next && (next.sched - it.sched > NIGHT_GAP_MS);
+        var schedStr = fmtTime(new Date(it.sched));
+        var estStr = fmtTime(new Date(it.ms));
+        html += '<span class="dep-t' + (it.cancelled ? ' is-cancelled' : '') + '">' +
+          (isLast ? '<span class="dep__tag">Last</span>' : isFirst ? '<span class="dep__tag">First</span>' : '') +
+          '<span class="dep__time">' + schedStr + '</span>' +
+          (it.cancelled ? '<span class="dep__cancel">Cancelled</span>'
+                        : (estStr !== schedStr ? '<span class="dep__late">~' + estStr + '</span>' : '')) +
+          '</span>';
+      }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+
+    // Too wide (e.g. several delays)? Drop second times, last direction first; then whole directions.
+    var guard = 0;
+    while (el.scrollWidth > el.clientWidth + 1 && guard++ < 10){
+      var grpEls = el.querySelectorAll('.dep-group');
+      var removed = false;
+      for (var r = grpEls.length - 1; r >= 0 && !removed; r--){
+        var ts = grpEls[r].querySelectorAll('.dep-t');
+        if (ts.length > 1) { grpEls[r].removeChild(ts[ts.length - 1]); removed = true; }
+      }
+      if (!removed) {
+        if (grpEls.length > 1) el.removeChild(grpEls[grpEls.length - 1]);
+        else break;
+      }
+    }
+  }
+
+  /* ---------- Station notices for Pohjois-Haaga (track works, replacement buses...) ---------- */
+  // Fintraffic passenger information (RAMI). only_general=true: notices about the
+  // station itself, not individual trains (those already show in the times).
+  var NOTICE_URL = 'https://rata.digitraffic.fi/api/v1/passenger-information/active?station=' +
+    TRAIN_STATION + '&only_general=true';
+  var noticeTimer = null;
+
+  function noticeText(msg){
+    var parts = [msg.video, msg.audio];
+    for (var i = 0; i < parts.length; i++){
+      var tx = parts[i] && parts[i].text;
+      if (tx && tx.en) return tx.en;
+    }
+    for (var j = 0; j < parts.length; j++){
+      var tf = parts[j] && parts[j].text;
+      if (tf && tf.fi) return tf.fi;
+    }
+    return '';
+  }
+
+  function loadNotices(){
+    var opts = sendUserHeader ? { headers: { 'Digitraffic-User': DIGITRAFFIC_USER } } : {};
+    fetch(NOTICE_URL, opts).then(function(r){
+      if (!r.ok) throw new Error('Digitraffic HTTP ' + r.status);
+      return r.json();
+    }).then(function(list){
+      var now = Date.now(), texts = [];
+      if (Array.isArray(list)){
+        for (var i = 0; i < list.length; i++){
+          var m = list[i];
+          var start = Date.parse(m.startValidity), end = Date.parse(m.endValidity);
+          if (!isNaN(start) && start > now) continue;
+          if (!isNaN(end) && end < now) continue;
+          var tx = noticeText(m).replace(/\s+/g, ' ').trim();
+          if (tx && texts.indexOf(tx) < 0) texts.push(tx);
+        }
+      }
+      var box = document.getElementById('trainNotice');
+      if (!texts.length) { box.hidden = true; return; }
+      var more = texts.length > 1 ? '<span class="map-notice__more">(+' + (texts.length - 1) + ' more)</span>' : '';
+      document.getElementById('trainNoticeText').innerHTML =
+        texts[0].replace(/[<>&]/g, '') + more;
+      box.hidden = false;
+    }).catch(function(){ /* keep whatever is showing; try again next round */ })
+      .then(function(){
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(loadNotices, 5 * 60 * 1000);
+      });
+  }
+
+  function loadTrains(){
+    fetchTrains().then(function(data){
+      var arr = Array.isArray(data) ? data : [];
+      trainDepartures = parseTrains(arr);
+      trainsOkAt = Date.now();
+      trainsFailed = false;
+      renderTrains();
+      scheduleTrains(30 * 1000);
+    }).catch(function(){
+      trainsFailed = true;
+      renderTrains();                       // keep counting down the last known times
+      scheduleTrains(60 * 1000);
+    });
+  }
+  function scheduleTrains(ms){
+    clearTimeout(trainsTimer);
+    trainsTimer = setTimeout(loadTrains, ms);
+  }
+
+  loadTrains();
+  loadNotices();
+  setInterval(renderTrains, 15 * 1000);     // minutes count down between fetches
+
+  loadWeather(); // reschedules itself; also refreshes the FMI strips
+
+  // Tablets pause timers while the screen is off. When the page becomes
+  // visible again, refresh straight away if the data has gone stale.
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - lastWeatherOkAt > 10 * 60 * 1000) loadWeather();
+    loadTrains();
+    loadNotices();
+    loadLightning();
+    loadRadar();
+  });
+
+  /* keep the day/night tint updating smoothly between fetches */
+  setInterval(function(){
+    if (lastSunrise && lastSunset) {
+      updateSunArc(lastSunrise, lastSunset);
+    }
+  }, 60000);
+
+})();
+</script>
+</body>
+</html>
