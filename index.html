@@ -23,7 +23,7 @@
     --border:#223050;
     --text:#EAF2FF;
     --muted:#93A6C8;
-    --muted-dim:#62769A;
+    --muted-dim:#7D91B4;   /* 5.4:1 on the panels (was 3.75:1) */
     --amber:#F4A94A;
     --teal:#4FD1C5;
     --red:#E8646B;
@@ -31,6 +31,15 @@
     --gap: calc(var(--u) * 1.1);
     --radius: calc(var(--u) * 1.6);
     --num: 'Space Grotesk', 'Inter', -apple-system, sans-serif;
+    /* type scale: every text uses one of these
+       (17 / 19 / 22 / 25 / 29 / 33 px on the 1024 x 768 iPad; the date, clock
+       and temperature are bigger on purpose) */
+    --fs-xs:  calc(var(--u) * 1.66);
+    --fs-s:   calc(var(--u) * 1.86);
+    --fs-m:   calc(var(--u) * 2.15);
+    --fs-l:   calc(var(--u) * 2.44);
+    --fs-xl:  calc(var(--u) * 2.83);
+    --fs-2xl: calc(var(--u) * 3.2);
   }
 
   * { box-sizing: border-box; }
@@ -116,12 +125,15 @@
   }
   .clock__date {
     font-size: calc(var(--u) * 4.1);
+    min-width: 0;                /* lets fitHeader() see when it doesn't fit its column */
     line-height: 1;
     letter-spacing: -0.015em;
     white-space: nowrap;
     padding-left: calc(var(--u) * 0.3);
   }
   .clock__weekday { color: var(--text); font-weight: 600; }
+  /* flag day: a little Finnish flag after the date */
+  .flag { display: inline-block; height: 0.62em; width: 1.02em; margin-left: 0.35em; vertical-align: 0.05em; border-radius: 2px; }
   .clock__daymonth { color: var(--muted); font-weight: 500; }
   .header-right {
     display: flex;
@@ -140,7 +152,7 @@
     display: flex;
     align-items: center;
     gap: calc(var(--u) * 0.7);
-    font-size: calc(var(--u) * 2.45);
+    font-size: var(--fs-l);
     font-weight: 500;
     line-height: 1;
     color: var(--muted);
@@ -211,8 +223,18 @@
     border: 1px solid var(--panel-edge);
     border-radius: calc(var(--u) * 0.9);
     padding: calc(var(--u) * 0.45) calc(var(--u) * 1);
-    font-size: calc(var(--u) * 1.6);
+    font-size: var(--fs-xs);
     color: var(--muted);
+    pointer-events: none;
+  }
+  /* map credit (Esri's terms ask for a visible one): tiny, bottom right */
+  .map-credit {
+    position: absolute;
+    right: calc(var(--u) * 0.8);
+    bottom: calc(var(--u) * 0.5);
+    z-index: 520;
+    font-size: calc(var(--u) * 1.05);
+    color: rgba(147, 166, 200, 0.55);
     pointer-events: none;
   }
   .radar-time { top: calc(var(--u) * 1.2); }
@@ -248,7 +270,7 @@
   .map-notice__icon { font-size: calc(var(--u) * 2.2); color: var(--amber); flex: 0 0 auto; margin-top: 0.1em; }
   .map-notice__icon .wi { stroke: currentColor; }
   .map-notice__text {
-    font-size: calc(var(--u) * 1.65);
+    font-size: var(--fs-s);
     line-height: 1.3;
     color: var(--text);
     display: -webkit-box;
@@ -265,39 +287,39 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: calc(var(--u) * 1.5) calc(var(--u) * 2.2) calc(var(--u) * 1.6);
+    padding: calc(var(--u) * 1.0) calc(var(--u) * 2.2) calc(var(--u) * 1.0);
   }
   .current__top {
     display: flex;
     align-items: center;
     gap: calc(var(--u) * 1.2);
   }
-  .current__icon { font-size: calc(var(--u) * 7.6); line-height: 1; flex: 0 0 auto; }
+  .current__icon { font-size: calc(var(--u) * 7.1); line-height: 1; flex: 0 0 auto; }
   .current__temp {
-    font-size: calc(var(--u) * 10.2);
+    font-size: calc(var(--u) * 9.4);
     font-weight: 700;
-    line-height: 0.9;
+    line-height: 0.8;            /* digits have no descenders: trims empty space only */
     letter-spacing: -0.04em;
     white-space: nowrap;
   }
   .current__cond {
-    font-size: calc(var(--u) * 2.5);
+    font-size: var(--fs-l);
     font-weight: 600;
     line-height: 1.15;
-    margin-top: calc(var(--u) * 0.7);
+    margin-top: calc(var(--u) * 0.35);
   }
   .current__feels {
-    font-size: calc(var(--u) * 1.9);
+    font-size: var(--fs-m);
     color: var(--muted);
     margin-top: calc(var(--u) * 0.2);
   }
-  .current__feels span { color: var(--text); font-weight: 600; }
+  .current__feels span { color: var(--text); font-weight: 700; }
 
   .current__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-gap: calc(var(--u) * 1.2) calc(var(--u) * 2);
-    margin-top: calc(var(--u) * 1.2);
+    grid-gap: calc(var(--u) * 0.7) calc(var(--u) * 2);
+    margin-top: calc(var(--u) * 0.7);
   }
   .stat {
     display: flex;
@@ -306,18 +328,18 @@
     min-width: 0;
   }
   .stat__label {
-    font-size: calc(var(--u) * 1.55);
+    font-size: var(--fs-xs);
     font-weight: 500;
     color: var(--muted-dim);
   }
   .stat__value {
-    font-size: calc(var(--u) * 3.2);
+    font-size: var(--fs-xl);
     font-weight: 600;
     line-height: 1.05;
     white-space: nowrap;
   }
   .unit {
-    font-size: 0.5em;
+    font-size: 0.6em;
     font-weight: 500;
     color: var(--muted);
     margin-left: 0.15em;
@@ -326,17 +348,45 @@
   .wind-arrow {
     display: inline-block;
     font-style: normal;
-    color: var(--teal);
+    color: var(--muted);          /* teal is kept for rain */
     margin-left: 0.35em;
     font-size: 0.6em;
     vertical-align: 0.1em;
   }
   .wind-dir {
-    font-size: 0.5em;
+    font-size: 0.6em;
     font-weight: 500;
     color: var(--muted);
     margin-left: 0.1em;
   }
+
+  /* daylight under the stats: "Daylight 6 h 46 min, −2 min" */
+  .current__daylight {
+    margin-top: calc(var(--u) * 0.5);
+    font-size: var(--fs-xs);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .current__daylight b { color: var(--text); font-weight: 600; }
+  /* when the panel gets short (e.g. the lightning banner is showing), drop
+     the least important bits step by step; see fitCurrent() */
+  .current-panel.compact-1 .current__daylight { display: none; }
+  .current-panel.compact-2 .current__temp { font-size: calc(var(--u) * 7.8); }
+  .current-panel.compact-2 .current__icon { font-size: calc(var(--u) * 6); }
+  .current-panel.compact-3 .stat--minor { display: none; }
+
+  /* small amber dot: the weather on screen is old (fetches have been failing) */
+  .stale-dot {
+    position: absolute;
+    top: calc(var(--u) * 1);
+    right: calc(var(--u) * 1);
+    width: calc(var(--u) * 1.1);
+    height: calc(var(--u) * 1.1);
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 0 3px rgba(244,169,74,0.2);
+  }
+  .stale-dot[hidden] { display: none; }
 
   /* HOURLY / WEEKLY STRIPS */
   .strip {
@@ -363,7 +413,7 @@
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
   }
   .strip-item__label {
-    font-size: calc(var(--u) * 1.8);
+    font-size: var(--fs-s);
     font-weight: 500;
     color: var(--muted);
     white-space: nowrap;
@@ -372,13 +422,13 @@
   .strip-item__icon { font-size: calc(var(--u) * 3.3); margin: calc(var(--u) * 0.25) 0 calc(var(--u) * 0.15); }
   .strip-item__temp {
     font-family: var(--num);
-    font-size: calc(var(--u) * 3.1);
+    font-size: var(--fs-2xl);
     letter-spacing: -0.01em;
     font-weight: 600;
     line-height: 1.1;
     white-space: nowrap;
   }
-  .daily .strip-item__temp { font-size: calc(var(--u) * 2.75); }
+  .daily .strip-item__temp { font-size: var(--fs-xl); }
   .daily .strip-item__temp-max { color: var(--text); }
   .daily .strip-item__temp-min { color: var(--muted-dim); margin-left: 0.2em; }
   .strip-item__pop {
@@ -391,11 +441,11 @@
   }
   .pop-num {
     font-family: var(--num);
-    font-size: calc(var(--u) * 1.55);
+    font-size: var(--fs-xs);
     font-weight: 500;
     color: var(--teal);
     line-height: 1;
-    min-height: calc(var(--u) * 1.55);
+    min-height: var(--fs-xs);
   }
   .pop-bar {
     width: 56%;
@@ -411,7 +461,7 @@
     border-radius: 2px;
   }
 
-  /* TRAINS FROM POHJOIS-HAAGA (bottom bar, also carries update time + credits) */
+  /* TRAINS FROM POHJOIS-HAAGA (bottom bar) */
   .transit {
     flex: 0 0 auto;
     display: flex;
@@ -449,7 +499,7 @@
     gap: calc(var(--u) * 0.55);
     margin-left: calc(var(--u) * 0.7);
   }
-  .dep__tag { font-size: calc(var(--u) * 1.4); font-weight: 500; color: var(--muted); }
+  .dep__tag { font-size: var(--fs-xs); font-weight: 500; color: var(--muted); }
   .dep__line {
     display: inline-flex;
     align-items: center;
@@ -461,38 +511,27 @@
     color: #fff;
     font-family: var(--num);
     font-weight: 700;
-    font-size: calc(var(--u) * 1.65);
+    font-size: var(--fs-xs);
   }
-  .dep__dest { font-size: calc(var(--u) * 1.85); color: var(--muted); }
+  .dep__dest { font-size: var(--fs-s); font-weight: 500; color: var(--text); }
   .dep__time {
     font-family: var(--num);
     font-variant-numeric: tabular-nums;
-    font-size: calc(var(--u) * 2.5);
+    font-size: var(--fs-l);
     font-weight: 600;
     color: var(--text);
   }
   .dep__late {
     font-family: var(--num);
     font-variant-numeric: tabular-nums;
-    font-size: calc(var(--u) * 2.1);
+    font-size: var(--fs-m);
     font-weight: 600;
     color: var(--amber);
     margin-left: calc(var(--u) * -0.2);
   }
-  .dep__cancel { font-size: calc(var(--u) * 1.7); font-weight: 600; color: var(--red); }
-  .dep-t.is-cancelled .dep__time { text-decoration: line-through; color: var(--muted-dim); }
-  .dep-empty { font-size: calc(var(--u) * 1.7); color: var(--muted-dim); }
-  .transit__meta {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0;
-    font-size: calc(var(--u) * 1.1);
-    line-height: 1.2;
-    color: var(--muted-dim);
-    text-align: right;
-  }
+  /* cancelled: struck through and dimmed, no estimate */
+  .dep-t.is-cancelled .dep__time { text-decoration: line-through; color: var(--muted-dim); opacity: 0.8; }
+  .dep-empty { font-size: var(--fs-s); color: var(--muted-dim); }
 
   /* LIGHTNING ALERT (only shown when a strike is within 20 km) */
   .lightning-alert {
@@ -507,8 +546,8 @@
   }
   .lightning-alert.active { display: flex; }
   .lightning-alert__icon { font-size: calc(var(--u) * 3); line-height: 1; }
-  .lightning-alert__text { font-weight: 700; font-size: calc(var(--u) * 2.1); }
-  .lightning-alert__sub { font-size: calc(var(--u) * 1.6); color: var(--muted); margin-top: 2px; }
+  .lightning-alert__text { font-weight: 700; font-size: var(--fs-m); }
+  .lightning-alert__sub { font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
   @keyframes alertGlow {
     0%, 100% { box-shadow: 0 0 0 rgba(232,100,107,0); }
     50% { box-shadow: 0 0 20px rgba(232,100,107,0.5); }
@@ -554,6 +593,7 @@
     <section class="panel radar-panel">
       <div id="map"></div>
       <div class="map-vignette"></div>
+      <div class="map-credit">Esri · FMI</div>
       <div class="map-pill radar-time num tnum" id="radarTime">Loading radar&hellip;</div>
       <div class="map-bottom">
         <div class="map-pill radar-legend num">
@@ -567,6 +607,7 @@
     </section>
 
     <section class="panel current-panel">
+      <span class="stale-dot" id="staleDot" hidden title="Weather hasn't updated"></span>
       <div>
         <div class="current__top">
           <div class="current__icon" id="curIcon"><svg class="wi" viewBox="-1 -1 26 26"><path class="wi-cloud" d="M18 10h-1.26A8 8 0 1 0 9 20h9a4 4 0 0 0 0-8z"/></svg></div>
@@ -579,9 +620,10 @@
       <div class="current__grid">
         <div class="stat"><span class="stat__label">Wind</span><span class="stat__value num" id="curWind">&ndash;</span></div>
         <div class="stat"><span class="stat__label">Gusts</span><span class="stat__value num" id="curGust">&ndash;</span></div>
-        <div class="stat"><span class="stat__label">Humidity</span><span class="stat__value num" id="curHumidity">&ndash;</span></div>
-        <div class="stat"><span class="stat__label">Pressure</span><span class="stat__value num" id="curPressure">&ndash;</span></div>
+        <div class="stat stat--minor"><span class="stat__label">Humidity</span><span class="stat__value num" id="curHumidity">&ndash;</span></div>
+        <div class="stat stat--minor"><span class="stat__label">Pressure</span><span class="stat__value num" id="curPressure">&ndash;</span></div>
       </div>
+      <div class="current__daylight" id="dayLength"></div>
     </section>
   </main>
 
@@ -591,12 +633,8 @@
   <footer class="transit" aria-label="Next trains from Pohjois-Haaga">
     <span class="transit__icon" title="Trains from Pohjois-Haaga"><svg class="wi" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="15" rx="3.5"/><path d="M5 10.5h14M9 14h.01M15 14h.01M8.5 17.5 6.5 21.5M15.5 17.5l2 4M7.6 19.5h8.8"/></svg></span>
     <div class="transit__list" id="trainList"><span class="dep-empty">Loading trains&hellip;</span></div>
-    <div class="transit__meta">
-      <span id="updatedAt">Starting up&hellip;</span>
-      <span>FMI, Open-Meteo, Esri</span>
-      <span>Fintraffic / digitraffic.fi</span>
-    </div>
   </footer>
+  <!-- Data: FMI (CC BY 4.0), Open-Meteo, Esri (basemap), Fintraffic / digitraffic.fi (CC BY 4.0) -->
 
 </div>
 
@@ -604,6 +642,7 @@
 <script>
 (function(){
 
+  var VERSION = '2.0';
   var LAT = 60.2292;
   var LON = 24.8842;
 
@@ -680,7 +719,7 @@
     return m >= mins(new Date(lastSunrise)) && m <= mins(new Date(lastSunset));
   }
 
-  // precip probability: thin bar always, numeric label only when it matters
+  // precip probability: thin bar from 10 %, numeric label from 30 %
   function popMarkup(pop){
     if (pop === null || typeof pop !== 'number' || isNaN(pop)) {
       return '<div class="strip-item__pop"></div>';
@@ -688,9 +727,11 @@
     var p = Math.max(0, Math.min(100, Math.round(pop)));
     var num = p >= 30 ? p + '%' : '';
     var fillOpacity = (0.35 + 0.65 * p / 100).toFixed(2);
+    // under 10 %: no bar at all (keeps its room, so the strip doesn't jump)
+    var hide = p < 10 ? ' style="visibility:hidden"' : '';
     return '<div class="strip-item__pop">' +
       '<span class="pop-num">' + num + '</span>' +
-      '<span class="pop-bar"><i style="width:' + p + '%;opacity:' + fillOpacity + '"></i></span>' +
+      '<span class="pop-bar"' + hide + '><i style="width:' + p + '%;opacity:' + fillOpacity + '"></i></span>' +
       '</div>';
   }
 
@@ -731,7 +772,7 @@
       77: ['snow', 'Snow grains'],
       80: ['drizzle', 'Light showers'],
       81: ['rain', 'Showers'],
-      82: ['thunder', 'Violent showers'],
+      82: ['rain', 'Violent showers'],
       85: ['snow', 'Snow showers'],
       86: ['snow', 'Heavy snow showers'],
       95: ['thunder', 'Thunderstorm'],
@@ -746,6 +787,43 @@
     return d.toLocaleTimeString('en-GB', { timeZone:'Europe/Helsinki', hour:'2-digit', minute:'2-digit' });
   }
 
+  /* ---------- Flag days (official and customary, Finland) ---------- */
+  var FLAG_DAYS = {
+    '02-05': 'J. L. Runebergin päivä', '02-28': 'Kalevalan päivä',
+    '03-19': 'Minna Canthin päivä, tasa-arvon päivä', '04-09': 'Mikael Agricolan päivä, suomen kielen päivä',
+    '04-27': 'Kansallinen veteraanipäivä', '05-01': 'Vappu, suomalaisen työn päivä', '05-09': 'Eurooppa-päivä',
+    '05-12': 'J. V. Snellmanin päivä, suomalaisuuden päivä', '06-04': 'Puolustusvoimain lippujuhlan päivä',
+    '07-06': 'Eino Leinon päivä, runon ja suven päivä', '10-01': 'Miina Sillanpään ja kansalaisvaikuttamisen päivä',
+    '10-10': 'Aleksis Kiven päivä, suomalaisen kirjallisuuden päivä', '10-24': 'YK:n päivä',
+    '11-06': 'Ruotsalaisuuden päivä', '11-20': 'Lapsen oikeuksien päivä', '12-06': 'Itsenäisyyspäivä',
+    '12-08': 'Jean Sibeliuksen päivä, suomalaisen musiikin päivä'
+  };
+  // the n-th given weekday (0 = Sunday) of a month; n = -1: the last one
+  function nthWeekday(y, m, wd, n){
+    if (n > 0){
+      var first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      return 1 + ((wd - first + 7) % 7) + (n - 1) * 7;
+    }
+    var lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    var lastWd = new Date(Date.UTC(y, m - 1, lastDay)).getUTCDay();
+    return lastDay - ((lastWd - wd + 7) % 7);
+  }
+  // today's flag day name in Helsinki, or ''
+  function flagDay(){
+    var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Helsinki', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .format(new Date()).split('-');
+    var y = +parts[0], m = +parts[1], d = +parts[2];
+    var fixed = FLAG_DAYS[parts[1] + '-' + parts[2]];
+    if (fixed) return fixed;
+    if (m === 5 && d === nthWeekday(y, 5, 0, 2)) return 'Äitienpäivä';
+    if (m === 5 && d === nthWeekday(y, 5, 0, 3)) return 'Kaatuneitten muistopäivä';
+    if (m === 6 && d >= 20 && d <= 26 && new Date(Date.UTC(y, 5, d)).getUTCDay() === 6) return 'Juhannuspäivä, Suomen lipun päivä';
+    if (m === 8 && d === nthWeekday(y, 8, 6, -1)) return 'Suomen luonnon päivä';
+    if (m === 11 && d === nthWeekday(y, 11, 0, 2)) return 'Isänpäivä';
+    return '';
+  }
+  var FLAG_SVG = '<svg class="flag" viewBox="0 0 18 11" aria-hidden="true"><rect width="18" height="11" fill="#fff"/><rect x="5" width="3" height="11" fill="#1F4FA3"/><rect y="4" width="18" height="3" fill="#1F4FA3"/></svg>';
+
   /* ---------- Clock ---------- */
   function tickClock(){
     var now = new Date();
@@ -753,11 +831,30 @@
     var weekday = now.toLocaleDateString('en-GB', { timeZone:'Europe/Helsinki', weekday:'long' });
     var dayMonth = now.toLocaleDateString('en-GB', { timeZone:'Europe/Helsinki', day:'numeric', month:'long' });
     document.getElementById('clockTime').innerHTML = p[0] + ':' + p[1] + '<span class="clock__sec">' + p[2] + '</span>';
-    document.getElementById('clockDate').innerHTML =
-      '<span class="clock__weekday">' + weekday + '</span> <span class="clock__daymonth">' + dayMonth + '</span>';
+    var flag = flagDay();
+    var html = '<span class="clock__weekday">' + weekday + '</span> <span class="clock__daymonth">' + dayMonth + '</span>' +
+      (flag ? FLAG_SVG : '');
+    var dateEl = document.getElementById('clockDate');
+    if (dateEl.innerHTML !== html) {
+      dateEl.innerHTML = html;
+      dateEl.title = flag;
+      fitHeader();
+    }
+  }
+  // a long date (+ flag) must never spill out of its column: shrink it if it would
+  function fitHeader(){
+    var d = document.getElementById('clockDate');
+    d.style.fontSize = '';
+    var size = parseFloat(window.getComputedStyle(d).fontSize), guard = 20;
+    while (d.scrollWidth > d.clientWidth + 1 && guard-- > 0){
+      size *= 0.95;
+      d.style.fontSize = size.toFixed(1) + 'px';
+    }
   }
   tickClock();
   setInterval(tickClock, 1000);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeader);
+  window.addEventListener('resize', fitHeader);
 
   /* ---------- Map ---------- */
   // NOTE: the radar layer below uses FMI's WMS "View Service" for EVALUATION
@@ -859,11 +956,31 @@
     return f;
   }
 
-  // FMI's composite radar updates every 5 minutes; build a short trailing
-  // window of timestamps ourselves (no separate frame-list API needed).
-  function buildFrameTimes(){
+  // FMI's composite radar updates every 5 minutes. The newest frame time is
+  // read from FMI's own layer description, so we never ask for a frame that
+  // isn't published yet (that answer is an XML error the browser blocks as
+  // "CORB"). If that lookup fails, fall back to the clock.
+  var RADAR_CAPS_URL = 'https://openwms.fmi.fi/geoserver/Radar/suomi_dbz_eureffin/wms?service=WMS&version=1.3.0&request=GetCapabilities';
+
+  function latestRadarTime(){
+    return fetch(RADAR_CAPS_URL).then(function(r){
+      if (!r.ok) throw new Error('caps HTTP ' + r.status);
+      return r.text();
+    }).then(function(xml){
+      // e.g. <Dimension name="time" ...>2026-11-14T15:15:00Z/2026-11-21T15:05:00Z/PT5M</Dimension>
+      var m = xml.match(/<Dimension[^>]*name="time"[^>]*>([^<]*)<\/Dimension>/);
+      if (!m) throw new Error('no time dimension');
+      var lastPart = m[1].trim().split(',').pop().split('/');
+      var end = Date.parse(lastPart.length >= 2 ? lastPart[1] : lastPart[0]);
+      if (isNaN(end)) throw new Error('bad time');
+      return Math.min(end, Date.now());
+    });
+  }
+
+  function buildFrameTimes(newestMs){
     var now = new Date();
     var flooredMs = now.getTime() - (now.getTime() % (5 * 60 * 1000));
+    if (typeof newestMs === 'number') flooredMs = newestMs - (newestMs % (5 * 60 * 1000));
     var offsets = [25, 20, 15, 10, 5, 0]; // minutes ago
     var frames = [];
     for (var i = 0; i < offsets.length; i++){
@@ -911,7 +1028,11 @@
   // Rebuild the frame window, reusing layers for times we already have, so
   // each 5-minute refresh downloads only the one new frame.
   function loadRadar(){
-    var times = buildFrameTimes();
+    latestRadarTime().then(applyRadarFrames, function(){ applyRadarFrames(); });
+  }
+
+  function applyRadarFrames(newestMs){
+    var times = buildFrameTimes(newestMs);
     var old = {};
     for (var i = 0; i < radarFrames.length; i++) old[radarFrames[i].time.getTime()] = radarFrames[i];
     var next = [];
@@ -1053,6 +1174,8 @@
       }
     }
     var el = document.getElementById('lightningAlert');
+    var wasActive = el.classList.contains('active');
+    setTimeout(function(){ if (el.classList.contains('active') !== wasActive) fitCurrent(); }, 0);
     if (nearest){
       el.classList.add('active');
       document.getElementById('lightningAlertText').textContent =
@@ -1175,8 +1298,8 @@
     + '?latitude=' + LAT + '&longitude=' + LON
     + '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,is_day'
     + '&hourly=temperature_2m,precipitation_probability,weather_code'
-    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset'
-    + '&timezone=Europe%2FHelsinki&forecast_days=7&wind_speed_unit=ms';
+    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,daylight_duration'
+    + '&timezone=Europe%2FHelsinki&forecast_days=7&past_days=1&wind_speed_unit=ms';   // yesterday: for the daylight change
 
   // Builds a "YYYY-MM-DDTHH" prefix for the current moment in Europe/Helsinki
   // wall-clock time, matching Open-Meteo's naive local timestamps exactly —
@@ -1217,16 +1340,17 @@
     }
   }
 
-  function renderDaily(daily){
+  function renderDaily(daily, first){
     var container = document.getElementById('dailyStrip');
     container.innerHTML = '';
     var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    for (var i = 0; i < daily.time.length && i < 7; i++){
+    for (var n = 0; n < 7 && (first || 0) + n < daily.time.length; n++){
+      var i = (first || 0) + n;
       var d = new Date(daily.time[i] + 'T12:00:00');
       var info = wmoInfo(daily.weather_code[i], 1);
-      var label = i === 0 ? 'Today' : dayNames[d.getDay()];
+      var label = n === 0 ? 'Today' : dayNames[d.getDay()];
       var item = document.createElement('div');
-      item.className = label === 'Today' ? 'strip-item is-now' : 'strip-item';
+      item.className = n === 0 ? 'strip-item is-now' : 'strip-item';
       item.innerHTML =
         '<div class="strip-item__label">' + label + '</div>' +
         '<div class="strip-item__icon">' + svgIcon(info[0]) + '</div>' +
@@ -1247,9 +1371,56 @@
     weatherTimer = setTimeout(loadWeather, ms);
   }
 
-  function hhmm(ms){
-    return new Date(ms).toLocaleTimeString('en-GB', { timeZone:'Europe/Helsinki', hour:'2-digit', minute:'2-digit' });
+  // "Daylight 6 h 46 min, −2 min": today's daylight and the change from
+  // yesterday. daylight_duration is in seconds (sunrise/sunset are rounded to
+  // the minute, so their difference can be a minute off).
+  function renderDayLength(daily, di, off){
+    var el = document.getElementById('dayLength');
+    function len(i){
+      if (i < 0) return null;
+      if (daily.daylight_duration && typeof daily.daylight_duration[i] === 'number') return daily.daylight_duration[i] / 60;
+      if (!daily.sunrise[i] || !daily.sunset[i]) return null;
+      return (omDate(daily.sunset[i], off) - omDate(daily.sunrise[i], off)) / 60000;
+    }
+    var today = len(di), yesterday = len(di - 1);
+    if (today === null) { el.textContent = ''; return; }
+    var total = Math.round(today), h = Math.floor(total / 60), m = total - h * 60;
+    var txt = 'Daylight <b>' + h + ' h ' + m + ' min</b>';
+    if (yesterday !== null) {
+      var diff = Math.round(today - yesterday);
+      txt += ', ' + (diff > 0 ? '+' + diff : diff < 0 ? '\u2212' + (-diff) : '\u00b10') + ' min';
+    }
+    el.innerHTML = txt;
   }
+
+  // Weather panel too short for everything (lightning banner showing, or a
+  // smaller screen)? Hide the least important bits, one step at a time.
+  function fitCurrent(){
+    var panel = document.querySelector('.current-panel');
+    if (!panel) return;
+    panel.classList.remove('compact-1', 'compact-2', 'compact-3');
+    function overflows(){
+      var items = panel.children, bottom = 0;
+      for (var i = 0; i < items.length; i++){
+        if (items[i].id === 'staleDot') continue;
+        var r = items[i].getBoundingClientRect();
+        if (r.height > 0) bottom = Math.max(bottom, r.bottom);
+      }
+      return bottom > panel.getBoundingClientRect().bottom - 6;
+    }
+    for (var step = 1; step <= 3 && overflows(); step++) panel.classList.add('compact-' + step);
+  }
+  window.addEventListener('resize', fitCurrent);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCurrent);
+
+  // amber dot on the weather panel when the weather hasn't updated for 30 min
+  var pageStart = Date.now();
+  function checkStale(){
+    var now = Date.now();
+    var stale = lastWeatherOkAt ? now - lastWeatherOkAt > 30 * 60 * 1000 : now - pageStart > 3 * 60 * 1000;
+    document.getElementById('staleDot').hidden = !stale;
+  }
+  setInterval(checkStale, 60 * 1000);
 
   function loadWeather(){
     // FMI strips are fetched independently, so they still appear if
@@ -1281,29 +1452,30 @@
         document.getElementById('curHumidity').innerHTML = withUnit(cur.relative_humidity_2m, '%');
         document.getElementById('curPressure').innerHTML = withUnit(cur.pressure_msl, 'hPa');
 
+        // daily data starts with yesterday (past_days=1): find today
+        var di = data.daily.time.indexOf(helsinkiDateKey(new Date()));
+        if (di < 0) di = 0;
         // sun times first, so hourly icons can pick day/night variants
-        updateSunArc(omDate(data.daily.sunrise[0], off), omDate(data.daily.sunset[0], off));
+        updateSunArc(omDate(data.daily.sunrise[di], off), omDate(data.daily.sunset[di], off));
+        renderDayLength(data.daily, di, off);
+        fitCurrent();
         // Open-Meteo strips are only a fallback: paint them if FMI hasn't
         // succeeded recently, otherwise the strips would flip between the two
         // sources every refresh.
         if (Date.now() - fmiStripsOkAt > 30 * 60 * 1000) {
           renderHourly(data.hourly, off);
-          renderDaily(data.daily);
+          renderDaily(data.daily, di);
         } else if (pendingFmiHourly) {
           renderHourlyFmi(pendingFmiHourly.byTime, pendingFmiHourly.times);
           pendingFmiHourly = null;
         }
 
         lastWeatherOkAt = Date.now();
-        document.getElementById('updatedAt').textContent = 'Updated ' + hhmm(lastWeatherOkAt);
+        checkStale();
         scheduleWeather(10 * 60 * 1000);
       })
       .catch(function(){
-        // Say how old the numbers on screen are, and retry soon.
-        document.getElementById('updatedAt').textContent = lastWeatherOkAt
-          ? 'Update failed \u00b7 showing data from ' + hhmm(lastWeatherOkAt) + ' \u00b7 retrying\u2026'
-          : 'Update failed \u2014 retrying\u2026';
-        scheduleWeather(60 * 1000);
+        scheduleWeather(60 * 1000);   // retry soon; the amber dot shows if it stays old
       });
   }
 
@@ -1436,7 +1608,6 @@
       // If this arrived before Open-Meteo's sunrise/sunset, redraw once they're
       // known so night hours don't get sun icons.
       pendingFmiHourly = lastSunrise ? null : { byTime: byTime, times: fromNow };
-      // (The footer's "Updated" time tracks the current-conditions panel only.)
     }).catch(function(){ /* Open-Meteo strips (if any) stay as-is */ });
   }
 
@@ -1448,8 +1619,8 @@
   var TRAINS_REQUESTED = 20;
   var TRAIN_URL = 'https://rata.digitraffic.fi/api/v1/live-trains/station/' + TRAIN_STATION +
     '?arrived_trains=0&arriving_trains=0&departed_trains=0&departing_trains=' + TRAINS_REQUESTED + '&include_nonstopping=false';
-  var DIGITRAFFIC_USER = 'weatherlassila/1.4'; // Fintraffic asks apps to identify themselves
-  var TIMES_PER_DIRECTION = 2;
+  var DIGITRAFFIC_USER = 'weatherlassila/' + VERSION; // Fintraffic asks apps to identify themselves
+  var TIMES_PER_DIRECTION = 3;
   var NIGHT_GAP_MS = 90 * 60 * 1000;   // a gap this long means "last train" / "first train"
   var DIRECTION_ORDER = ['Helsinki', 'Airport'];
   var STATION_NAMES = { HKI: 'Helsinki', PSL: 'Pasila', HPL: 'Huopalahti', KAN: 'Kannelmäki',
@@ -1536,7 +1707,7 @@
     var html = '';
     for (var g = 0; g < order.length; g++){
       var grp = groups[order[g]];
-      html += '<div class="dep-group">' +
+      html += '<div class="dep-group">' +   // cancelled: struck through + dimmed (CSS)
         '<span class="dep__line">' + grp.line.replace(/[^A-Za-z0-9]/g, '') + '</span>' +
         '<span class="dep__dest">' + grp.dest.replace(/[<>&]/g, '') + '</span>';
       for (var k = 0; k < grp.items.length && k < TIMES_PER_DIRECTION; k++){
@@ -1554,27 +1725,27 @@
         html += '<span class="dep-t' + (it.cancelled ? ' is-cancelled' : '') + '">' +
           (isLast ? '<span class="dep__tag">Last</span>' : isFirst ? '<span class="dep__tag">First</span>' : '') +
           '<span class="dep__time">' + schedStr + '</span>' +
-          (it.cancelled ? '<span class="dep__cancel">Cancelled</span>'
-                        : (estStr !== schedStr ? '<span class="dep__late">~' + estStr + '</span>' : '')) +
+          (!it.cancelled && estStr !== schedStr ? '<span class="dep__late">~' + estStr + '</span>' : '') +
           '</span>';
       }
       html += '</div>';
     }
     el.innerHTML = html;
 
-    // Too wide (e.g. several delays)? Drop second times, last direction first; then whole directions.
+    // Too wide (e.g. several delays)? Drop the last time from whichever
+    // direction has the most (ties: the later direction), so both keep as many
+    // as possible; only then drop a whole direction.
     var guard = 0;
-    while (el.scrollWidth > el.clientWidth + 1 && guard++ < 10){
+    while (el.scrollWidth > el.clientWidth + 1 && guard++ < 12){
       var grpEls = el.querySelectorAll('.dep-group');
-      var removed = false;
-      for (var r = grpEls.length - 1; r >= 0 && !removed; r--){
-        var ts = grpEls[r].querySelectorAll('.dep-t');
-        if (ts.length > 1) { grpEls[r].removeChild(ts[ts.length - 1]); removed = true; }
+      var best = null, bestN = 1;
+      for (var r = 0; r < grpEls.length; r++){
+        var n = grpEls[r].querySelectorAll('.dep-t').length;
+        if (n > 1 && n >= bestN) { best = grpEls[r]; bestN = n; }
       }
-      if (!removed) {
-        if (grpEls.length > 1) el.removeChild(grpEls[grpEls.length - 1]);
-        else break;
-      }
+      if (best) { var ts = best.querySelectorAll('.dep-t'); best.removeChild(ts[ts.length - 1]); }
+      else if (grpEls.length > 1) el.removeChild(grpEls[grpEls.length - 1]);
+      else break;
     }
   }
 
