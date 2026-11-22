@@ -238,6 +238,11 @@
     pointer-events: none;
   }
   .radar-time { top: calc(var(--u) * 1.2); }
+  /* top right of the map: "Daylight 6 h 46 min, −2 min" (always has room here,
+     whatever the screen height) */
+  .daylight-pill { display: block; top: calc(var(--u) * 1.2); left: auto; right: calc(var(--u) * 1.2); white-space: nowrap; }
+  .daylight-pill b { color: var(--text); font-weight: 600; }
+  .daylight-pill:empty { display: none; }
   .radar-time b { color: var(--teal); font-weight: 600; margin-right: 0.3em; }
   /* bottom of the map: lightning pill, with the train notice under it when active */
   .map-bottom {
@@ -287,7 +292,7 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: calc(var(--u) * 1.0) calc(var(--u) * 2.2) calc(var(--u) * 1.0);
+    padding: calc(var(--u) * 1.3) calc(var(--u) * 2.2) calc(var(--u) * 1.3);
   }
   .current__top {
     display: flex;
@@ -318,8 +323,8 @@
   .current__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-gap: calc(var(--u) * 0.7) calc(var(--u) * 2);
-    margin-top: calc(var(--u) * 0.7);
+    grid-gap: calc(var(--u) * 0.9) calc(var(--u) * 2);
+    margin-top: calc(var(--u) * 0.9);
   }
   .stat {
     display: flex;
@@ -360,20 +365,11 @@
     margin-left: 0.1em;
   }
 
-  /* daylight under the stats: "Daylight 6 h 46 min, −2 min" */
-  .current__daylight {
-    margin-top: calc(var(--u) * 0.5);
-    font-size: var(--fs-xs);
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .current__daylight b { color: var(--text); font-weight: 600; }
   /* when the panel gets short (e.g. the lightning banner is showing), drop
      the least important bits step by step; see fitCurrent() */
-  .current-panel.compact-1 .current__daylight { display: none; }
-  .current-panel.compact-2 .current__temp { font-size: calc(var(--u) * 7.8); }
-  .current-panel.compact-2 .current__icon { font-size: calc(var(--u) * 6); }
-  .current-panel.compact-3 .stat--minor { display: none; }
+  .current-panel.compact-1 .current__temp { font-size: calc(var(--u) * 7.8); }
+  .current-panel.compact-1 .current__icon { font-size: calc(var(--u) * 6); }
+  .current-panel.compact-2 .stat--minor { display: none; }
 
   /* small amber dot: the weather on screen is old (fetches have been failing) */
   .stale-dot {
@@ -595,6 +591,7 @@
       <div class="map-vignette"></div>
       <div class="map-credit">Esri · FMI</div>
       <div class="map-pill radar-time num tnum" id="radarTime">Loading radar&hellip;</div>
+      <div class="map-pill daylight-pill" id="dayLength"></div>
       <div class="map-bottom">
         <div class="map-pill radar-legend num">
           <div id="lightningCount">&#9889; &mdash;</div>
@@ -623,7 +620,6 @@
         <div class="stat stat--minor"><span class="stat__label">Humidity</span><span class="stat__value num" id="curHumidity">&ndash;</span></div>
         <div class="stat stat--minor"><span class="stat__label">Pressure</span><span class="stat__value num" id="curPressure">&ndash;</span></div>
       </div>
-      <div class="current__daylight" id="dayLength"></div>
     </section>
   </main>
 
@@ -642,7 +638,7 @@
 <script>
 (function(){
 
-  var VERSION = '2.0';
+  var VERSION = '2.1';
   var LAT = 60.2292;
   var LON = 24.8842;
 
@@ -1398,7 +1394,7 @@
   function fitCurrent(){
     var panel = document.querySelector('.current-panel');
     if (!panel) return;
-    panel.classList.remove('compact-1', 'compact-2', 'compact-3');
+    panel.classList.remove('compact-1', 'compact-2');
     function overflows(){
       var items = panel.children, bottom = 0;
       for (var i = 0; i < items.length; i++){
@@ -1408,7 +1404,7 @@
       }
       return bottom > panel.getBoundingClientRect().bottom - 6;
     }
-    for (var step = 1; step <= 3 && overflows(); step++) panel.classList.add('compact-' + step);
+    for (var step = 1; step <= 2 && overflows(); step++) panel.classList.add('compact-' + step);
   }
   window.addEventListener('resize', fitCurrent);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCurrent);
